@@ -3,7 +3,12 @@
 
 set -e
 
-echo "📦 Installing ext-pack..."
+# Check if already installed
+if command -v ext-pack &> /dev/null; then
+    echo "📦 ext-pack is already installed. Reinstalling..."
+else
+    echo "📦 Installing ext-pack..."
+fi
 
 # Create temp directory
 TEMP_DIR=$(mktemp -d)

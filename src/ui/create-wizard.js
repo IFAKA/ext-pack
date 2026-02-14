@@ -2,7 +2,7 @@
  * Interactive wizard for creating extension packs
  */
 
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import inquirer from 'inquirer';
 import ora from 'ora';
@@ -168,13 +168,18 @@ export async function runCreateWizard() {
   ]);
 
   // Step 7: Choose output location
+  const packsDir = join(homedir(), '.ext-pack', 'packs');
+  if (!existsSync(packsDir)) {
+    mkdirSync(packsDir, { recursive: true });
+  }
+
   const defaultFileName = `${packName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
   const { outputFile } = await inquirer.prompt([
     {
       type: 'input',
       name: 'outputFile',
       message: 'Save pack as:',
-      default: join(process.cwd(), defaultFileName)
+      default: join(packsDir, defaultFileName)
     }
   ]);
 

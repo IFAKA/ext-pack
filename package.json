@@ -1,0 +1,42 @@
+{
+  "name": "ext-pack",
+  "version": "1.0.0",
+  "description": "Bundle and install Chrome/Brave extensions with zero friction",
+  "type": "module",
+  "bin": {
+    "ext-pack": "./bin/ext-pack.js"
+  },
+  "scripts": {
+    "dev": "node bin/ext-pack.js",
+    "link": "npm link",
+    "unlink": "npm unlink -g ext-pack"
+  },
+  "keywords": [
+    "chrome",
+    "brave",
+    "extension",
+    "pack",
+    "bundle",
+    "installer",
+    "cli"
+  ],
+  "author": "faka",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.0",
+    "ora": "^7.0.0",
+    "chalk": "^5.3.0",
+    "cli-progress": "^3.12.0",
+    "qrcode-terminal": "^0.12.0",
+    "boxen": "^7.1.0",
+    "gradient-string": "^2.0.2",
+    "fs-extra": "^11.2.0",
+    "unzipper": "^0.11.0",
+    "node-fetch": "^3.3.0",
+    "find-process": "^1.4.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

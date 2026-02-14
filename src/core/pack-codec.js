@@ -84,8 +84,8 @@ export function validate(pack) {
     errors.push('Extensions array is required');
   } else {
     pack.extensions.forEach((ext, i) => {
-      if (!ext.type || !['store', 'github', 'local'].includes(ext.type)) {
-        errors.push(`Extension ${i}: invalid type (must be 'store', 'github', or 'local')`);
+      if (!ext.type || !['store', 'github', 'local', 'bundled'].includes(ext.type)) {
+        errors.push(`Extension ${i}: invalid type (must be 'store', 'github', 'local', or 'bundled')`);
       }
 
       if (!ext.name) {
@@ -102,6 +102,15 @@ export function validate(pack) {
 
       if (ext.type === 'local' && !ext.path) {
         errors.push(`Extension ${i}: local path is required`);
+      }
+
+      if (ext.type === 'bundled') {
+        if (!ext.files || typeof ext.files !== 'object') {
+          errors.push(`Extension ${i}: bundled type requires 'files' object`);
+        }
+        if (!ext.version) {
+          errors.push(`Extension ${i}: bundled type requires 'version' field`);
+        }
       }
     });
   }

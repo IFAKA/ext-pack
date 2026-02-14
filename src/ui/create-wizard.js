@@ -11,6 +11,7 @@ import { colors, successBox, errorBox, clearScreen, browseDirectory, pause } fro
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
+import { bundleExtension, calculateBundleSize } from '../core/bundle-codec.js';
 
 /**
  * Run the create pack wizard
@@ -179,7 +180,43 @@ export async function runCreateWizard() {
     }
   }
 
-  // Step 5: Optionally generate description with Ollama
+  // Step 5: Bundle local extensions
+  const bundleSpinner = ora('Bundling extensions...').start();
+
+  let totalOriginalSize = 0;
+  let totalBundledSize = 0;
+  const bundledExtensions = [];
+
+  for (const ext of selectedExtensions) {
+    if (ext.type === 'local') {
+      try {
+        const bundled = await bundleExtension(ext.path);
+        const bundledSize = calculateBundleSize(bundled);
+
+        bundledExtensions.push(bundled);
+        totalBundledSize += bundledSize;
+
+        // Estimate original size (base64 content length is roughly the compressed size)
+        totalOriginalSize += bundledSize * 1.3; // Rough estimate
+      } catch (err) {
+        bundleSpinner.fail(`Failed to bundle ${ext.name}`);
+        console.log(errorBox(
+          `Failed to bundle extension: ${ext.name}\n\n` +
+          colors.muted(`Error: ${err.message}`)
+        ));
+        await pause();
+        return null;
+      }
+    } else {
+      // Keep non-local extensions as-is
+      bundledExtensions.push(ext);
+    }
+  }
+
+  const bundledSizeMB = (totalBundledSize / 1024 / 1024).toFixed(2);
+  bundleSpinner.succeed(`Extensions bundled (${bundledSizeMB} MB compressed)`);
+
+  // Step 6: Optionally generate description with Ollama
   let generatedDescription = null;
   const ollamaAvailable = await isOllamaRunning();
 
@@ -194,17 +231,17 @@ export async function runCreateWizard() {
     ]);
 
     if (useOllama) {
-      generatedDescription = await generateDescription(selectedExtensions);
+      generatedDescription = await generateDescription(bundledExtensions);
     }
   }
 
-  // Step 6: Get pack description and author
+  // Step 7: Get pack description and author
   const { description, author } = await inquirer.prompt([
     {
       type: 'input',
       name: 'description',
       message: 'Pack description (optional):',
-      default: generatedDescription || `${selectedExtensions.length} browser extensions`
+      default: generatedDescription || `${bundledExtensions.length} browser extensions`
     },
     {
       type: 'input',
@@ -214,7 +251,7 @@ export async function runCreateWizard() {
     }
   ]);
 
-  // Step 7: Choose output location
+  // Step 8: Choose output location
   const packsDir = join(homedir(), '.ext-pack', 'packs');
   if (!existsSync(packsDir)) {
     mkdirSync(packsDir, { recursive: true });
@@ -235,7 +272,7 @@ export async function runCreateWizard() {
     packName,
     description,
     author,
-    selectedExtensions
+    bundledExtensions
   );
 
   // Write pack file
@@ -248,7 +285,8 @@ export async function runCreateWizard() {
     console.log(successBox(
       `Pack: ${colors.highlight(pack.name)}\n\n` +
       `File: ${outputFile}\n` +
-      `Extensions: ${selectedExtensions.length}\n` +
+      `Extensions: ${bundledExtensions.length}\n` +
+      `Size: ${bundledSizeMB} MB\n` +
       `Created: ${pack.created}`
     ));
 

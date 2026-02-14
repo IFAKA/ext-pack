@@ -9,6 +9,7 @@ import { downloadRelease, parseRepo, findExtensionDir } from './github-api.js';
 import { getExtensionInfo } from './extension-scanner.js';
 import { getCacheDir, addInstalledPack } from '../utils/config-manager.js';
 import { relaunchBrowser } from './browser-launcher.js';
+import { extractBundledExtension } from './bundle-codec.js';
 
 /**
  * Process extension pack and prepare extensions for installation
@@ -20,6 +21,7 @@ export async function processPack(pack, onProgress = null) {
   const results = {
     local: [],
     github: [],
+    bundled: [],
     store: [],
     errors: []
   };
@@ -44,6 +46,10 @@ export async function processPack(pack, onProgress = null) {
         // Verify local extension exists
         const result = await processLocalExtension(ext);
         results.local.push(result);
+      } else if (ext.type === 'bundled') {
+        // Extract bundled extension
+        const result = await processBundledExtension(ext);
+        results.bundled.push(result);
       } else if (ext.type === 'github') {
         // Download GitHub extension
         const result = await processGitHubExtension(ext, (progress) => {
@@ -98,6 +104,47 @@ async function processLocalExtension(ext) {
     extension: ext,
     path: ext.path,
     status: 'ready',
+    info
+  };
+}
+
+/**
+ * Process a bundled extension
+ * @param {Object} ext - Bundled extension object
+ * @returns {Promise<Object>}
+ */
+async function processBundledExtension(ext) {
+  // Determine cache path for extracted extension
+  const cacheDir = getCacheDir();
+  const cacheName = `bundled-${ext.name.toLowerCase().replace(/\s+/g, '-')}-${ext.version}`;
+  const cachePath = join(cacheDir, cacheName);
+
+  // Check if already extracted
+  if (existsSync(cachePath)) {
+    const info = getExtensionInfo(cachePath);
+    if (info) {
+      return {
+        extension: ext,
+        path: cachePath,
+        status: 'cached',
+        info
+      };
+    }
+  }
+
+  // Extract bundled extension
+  await extractBundledExtension(ext, cachePath);
+
+  // Validate extracted extension
+  const info = getExtensionInfo(cachePath);
+  if (!info) {
+    throw new Error('Extracted bundled extension is invalid');
+  }
+
+  return {
+    extension: ext,
+    path: cachePath,
+    status: 'extracted',
     info
   };
 }
@@ -179,6 +226,7 @@ export async function installPack(packFilePath, browser, options = {}) {
   // Collect all extension paths
   const extensionPaths = [
     ...results.local.map(r => r.path),
+    ...results.bundled.map(r => r.path),
     ...results.github.map(r => r.path)
   ];
 
@@ -211,7 +259,7 @@ export async function installPack(packFilePath, browser, options = {}) {
   addInstalledPack({
     name: pack.name,
     file: packFilePath,
-    extensions: results.local.concat(results.github).map(r => ({
+    extensions: results.local.concat(results.bundled, results.github).map(r => ({
       name: r.extension.name,
       path: r.path,
       status: 'loaded'

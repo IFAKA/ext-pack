@@ -63,7 +63,7 @@ ext-pack
 ### 🗑️ One-Command Uninstall (No Traces)
 
 ```bash
-npm unlink -g ext-pack && rm -rf ~/.ext-pack
+npm uninstall -g ext-pack && rm -rf ~/.ext-pack
 ```
 
 **Or if you cloned:**

@@ -3,9 +3,9 @@
 
 echo "🗑️  Uninstalling ext-pack..."
 
-# Unlink from global
-echo "🔗 Removing global link..."
-npm unlink -g ext-pack 2>/dev/null || true
+# Uninstall from global
+echo "🔗 Uninstalling globally..."
+npm uninstall -g ext-pack 2>/dev/null || true
 
 # Remove user config/cache
 echo "🧹 Removing config and cache..."

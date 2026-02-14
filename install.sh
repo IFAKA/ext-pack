@@ -18,9 +18,9 @@ cd ext-pack
 echo "📦 Installing dependencies..."
 npm install
 
-# Link globally
-echo "🔗 Linking globally..."
-npm link
+# Install globally
+echo "🔗 Installing globally..."
+npm install -g .
 
 # Cleanup
 cd ~

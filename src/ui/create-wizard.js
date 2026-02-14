@@ -2,6 +2,7 @@
  * Interactive wizard for creating extension packs
  */
 
+import { existsSync } from 'fs';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
@@ -49,15 +50,10 @@ export async function runCreateWizard() {
       message: 'Directory to scan for extensions:',
       default: process.cwd(),
       validate: (input) => {
-        try {
-          const { existsSync } = require('fs');
-          if (!existsSync(input)) {
-            return 'Directory does not exist';
-          }
-          return true;
-        } catch {
-          return 'Invalid directory path';
+        if (!existsSync(input)) {
+          return 'Directory does not exist';
         }
+        return true;
       }
     }
   ]);

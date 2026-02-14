@@ -5,15 +5,10 @@ set -e
 
 echo "📦 Installing ext-pack..."
 
-# Load nvm if available
-if [ -d "$HOME/.nvm" ]; then
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-    # Use default node version or current
-    if [ -f "$NVM_DIR/alias/default" ]; then
-        nvm use default --silent
-    fi
+# Check if Node.js is available
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js not found. Please install Node.js first."
+    exit 1
 fi
 
 # Create temp directory
@@ -36,7 +31,4 @@ rm -rf "$TEMP_DIR"
 
 echo ""
 echo "✅ Installed! Run: ext-pack"
-echo ""
-echo "⚠️  If 'command not found', reload your shell:"
-echo "   source ~/.zshrc"
 echo ""

@@ -211,7 +211,7 @@ async function updateRegistryViaPR(octokit, username, metadata) {
   const newContentBase64 = Buffer.from(newContent, 'utf-8').toString('base64');
 
   // Update file in fork
-  await octokit.repos.createOrUpdateFileContents({
+  const { data: commit } = await octokit.repos.createOrUpdateFileContents({
     owner: username,
     repo: REGISTRY_REPO,
     path: 'registry.json',
@@ -219,6 +219,9 @@ async function updateRegistryViaPR(octokit, username, metadata) {
     content: newContentBase64,
     sha: file.sha
   });
+
+  // Wait for commit to be fully processed
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   // Create pull request
   const { data: pr } = await octokit.pulls.create({

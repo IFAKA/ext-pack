@@ -9,6 +9,11 @@ echo "📦 Installing ext-pack..."
 if [ -d "$HOME/.nvm" ]; then
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+    # Use default node version or current
+    if [ -f "$NVM_DIR/alias/default" ]; then
+        nvm use default --silent
+    fi
 fi
 
 # Create temp directory

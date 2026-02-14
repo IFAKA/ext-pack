@@ -3,11 +3,12 @@
 
 set -e
 
-# Check if already installed
-if command -v ext-pack &> /dev/null; then
-    echo "📦 ext-pack is already installed. Reinstalling..."
-else
-    echo "📦 Installing ext-pack..."
+echo "📦 Installing ext-pack..."
+
+# Load nvm if available
+if [ -d "$HOME/.nvm" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
 # Create temp directory
@@ -16,23 +17,21 @@ cd "$TEMP_DIR"
 
 # Clone repository
 echo "📥 Cloning repository..."
-git clone https://github.com/IFAKA/ext-pack.git
+git clone -q https://github.com/IFAKA/ext-pack.git
 cd ext-pack
 
-# Install dependencies
-echo "📦 Installing dependencies..."
-npm install
-
-# Install globally
-echo "🔗 Installing globally..."
-npm install -g .
+# Install dependencies and link globally
+echo "📦 Installing..."
+npm install --silent
+npm install -g . --silent
 
 # Cleanup
 cd ~
 rm -rf "$TEMP_DIR"
 
 echo ""
-echo "✅ ext-pack installed successfully!"
+echo "✅ Installed! Run: ext-pack"
 echo ""
-echo "Run: ext-pack"
+echo "⚠️  If 'command not found', reload your shell:"
+echo "   source ~/.zshrc"
 echo ""

@@ -1,140 +1,168 @@
-# 📦 ext-pack
+# ext-pack
 
-> Bundle and install Chrome/Brave extensions with zero friction
+> **The npm for browser extensions** - Bundle, publish, discover, and install browser extension packs with zero friction.
 
-Install multiple browser extensions in one command. No more clicking "Load unpacked" for each extension!
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/IFAKA/ext-pack)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+ext-pack lets you bundle multiple browser extensions into a single portable pack, publish them to a registry, and share them with anyone. Think of it as package management for browser extensions.
 
 ## ✨ Features
 
-- **🚀 One-Command Install** - Load multiple extensions instantly
-- **📦 Create Packs** - Bundle your favorite extensions
-- **🔗 Share Anywhere** - Generate URLs or QR codes
-- **🎯 Zero Learning Curve** - Interactive menus guide you
-- **💾 Persistent** - Extensions stay after browser restart
-- **🌐 GitHub Support** - Auto-download from releases
-- **🎨 Beautiful CLI** - Colorful, emoji-rich interface
-
-## 🎥 Demo
-
-```bash
-$ ext-pack
-
-███████╗██╗  ██╗████████╗      ██████╗  █████╗  ██████╗██╗  ██╗
-██╔════╝╚██╗██╔╝╚══██╔══╝      ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
-█████╗   ╚███╔╝    ██║   █████╗██████╔╝███████║██║     █████╔╝
-██╔══╝   ██╔██╗    ██║   ╚════╝██╔═══╝ ██╔══██║██║     ██╔═██╗
-███████╗██╔╝ ██╗   ██║         ██║     ██║  ██║╚██████╗██║  ██╗
-╚══════╝╚═╝  ╚═╝   ╚═╝         ╚═╝     ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-
-         Bundle and install extensions with zero friction
-
-? What do you want to do?
-  ❯ 📦 Create a new extension pack
-    ⚡ Install an extension pack
-    📋 List my installed packs
-    🔗 Share a pack
-```
+- 📦 **Bundle extensions** - Combine multiple extensions into one portable `.extpack` file
+- 🗜️ **Smart compression** - Gzip compression reduces pack size by 60-70%
+- 🚀 **One-command install** - Install extension packs by name from the registry
+- 🔍 **Discover packs** - Search and browse curated extension collections
+- 🌐 **Publish & share** - Publish your packs to the public registry in seconds
+- 💻 **Works offline** - Packs are self-contained with all extensions embedded
+- 🎯 **Zero config** - Just install and go, no setup required
+- 🔧 **Modern CLI** - Dual-mode: interactive wizards OR direct commands
+- ⚡ **Shell autocomplete** - Tab completion for commands and pack names
 
 ## 📥 Installation
 
-### ⚡ One-Command Install (No Cloning Required)
-
 ```bash
-curl -sL https://raw.githubusercontent.com/IFAKA/ext-pack/main/install.sh | bash
+npm install -g ext-pack
 ```
 
-Then run: `ext-pack`
-
-### 🔧 Manual Install (If You Cloned)
+Or from source:
 
 ```bash
-cd ext-pack && ./install.sh
-```
-
-Or:
-
-```bash
+git clone https://github.com/IFAKA/ext-pack.git
 cd ext-pack
 npm install
 npm link
-ext-pack
 ```
-
-### 🗑️ One-Command Uninstall (No Traces)
-
-```bash
-npm uninstall -g ext-pack && rm -rf ~/.ext-pack
-```
-
-**Or if you cloned:**
-
-```bash
-cd ext-pack && ./uninstall.sh
-```
-
-This removes **everything**:
-- ✓ Global npm link
-- ✓ All config files (`~/.ext-pack`)
-- ✓ All cached downloads
-- ✓ Installation registry
-
-**Zero traces left behind!**
 
 ## 🚀 Quick Start
 
-### Create Your First Pack
-
-1. Navigate to a directory with extensions:
-   ```bash
-   cd /path/to/browser-extensions
-   ext-pack
-   ```
-
-2. Choose "Create a new extension pack"
-
-3. Follow the prompts:
-   - Enter pack name
-   - Select extensions to bundle
-   - Save the `.extpack` file
-
-### Install a Pack
+### Create your first pack
 
 ```bash
 # Interactive mode
-ext-pack
+ext-pack create
 
-# Direct install
-ext-pack my-pack.extpack
+# Or with options
+ext-pack create my-pack -d ~/my-extensions
 ```
 
-### Share a Pack
-
-1. Choose "Share a pack" from menu
-2. Select sharing method:
-   - **URL**: Generate shareable link
-   - **QR Code**: Display scannable code
-   - **File Path**: Copy local path
-
-## 📖 Usage
-
-### Interactive Mode (Recommended)
-
-Just run `ext-pack` with no arguments:
+### Install a pack
 
 ```bash
-ext-pack
+# From registry
+ext-pack install productivity-pack
+
+# From file
+ext-pack install my-pack.extpack
+
+# From URL
+ext-pack install https://github.com/user/packs/releases/download/v1.0.0/pack.extpack
 ```
 
-The interactive menu guides you through everything!
-
-### Direct Commands
+### Publish to registry
 
 ```bash
-# Install a pack file
-ext-pack my-pack.extpack
-
-# That's it! No complex commands to remember.
+ext-pack publish my-pack.extpack
 ```
+
+### Search for packs
+
+```bash
+ext-pack search productivity --tag privacy
+```
+
+## 📚 Commands
+
+### `ext-pack` (no args)
+
+Interactive menu - guides you through all features.
+
+### `ext-pack create [name]`
+
+Create a new extension pack.
+
+```bash
+ext-pack create                    # Interactive
+ext-pack create my-pack            # With name
+ext-pack create -d ~/extensions    # Scan specific directory
+ext-pack create -y                 # Skip confirmations
+```
+
+**Options:**
+- `-o, --output <path>` - Output file path
+- `-d, --dir <path>` - Directory to scan
+- `-y, --yes` - Skip confirmations
+
+### `ext-pack install [pack]`
+
+Install a pack from file, URL, or registry.
+
+```bash
+ext-pack install dev-tools              # From registry
+ext-pack install ./my-pack.extpack      # From file
+ext-pack install https://...            # From URL
+ext-pack install my-pack -b brave       # Specify browser
+```
+
+**Options:**
+- `-b, --browser <name>` - Browser (brave, chrome, edge, chromium)
+- `-y, --yes` - Skip confirmations
+- `--no-relaunch` - Don't relaunch browser
+
+### `ext-pack publish [pack]`
+
+Publish a pack to the registry.
+
+```bash
+ext-pack publish my-pack.extpack
+ext-pack publish --tag v1.2.0
+```
+
+**Requirements:** GitHub auth via `gh auth login` or `GITHUB_TOKEN`
+
+### `ext-pack search <query>`
+
+Search the registry for packs.
+
+```bash
+ext-pack search productivity           # Basic search
+ext-pack search dev --tag javascript   # Filter by tag
+ext-pack search privacy --sort stars   # Sort by stars
+ext-pack search --json                 # JSON output
+```
+
+**Options:**
+- `--tag <tag>` - Filter by tag
+- `--sort <field>` - Sort by: downloads, stars, updated, name
+- `--limit <n>` - Max results (default: 20)
+- `--json` - JSON output
+
+### `ext-pack share [pack]`
+
+Generate shareable URL and QR code.
+
+```bash
+ext-pack share my-pack.extpack
+```
+
+### `ext-pack list`
+
+List all installed packs.
+
+```bash
+ext-pack list          # Human-readable
+ext-pack list --json   # JSON output
+```
+
+### `ext-pack completion`
+
+Install shell autocomplete.
+
+```bash
+ext-pack completion
+```
+
+Enables tab completion for commands, pack names, and options.
 
 ## 🎯 How It Works
 
@@ -152,31 +180,31 @@ ext-pack my-pack.extpack
 
 ## 📦 Pack Format
 
-Pack files are JSON with `.extpack` extension:
+Packs are JSON files (`.extpack`) containing bundled extensions and metadata.
 
 ```json
 {
   "v": 3,
-  "name": "My Dev Tools",
-  "description": "Essential extensions",
-  "author": "username",
-  "created": "2026-02-14",
+  "name": "productivity-pack",
+  "description": "Essential productivity extensions",
+  "author": {
+    "name": "Your Name",
+    "github": "username"
+  },
+  "version": "1.0.0",
+  "tags": ["productivity", "focus"],
+  "created": "2026-02-15",
   "extensions": [
     {
-      "type": "local",
-      "path": "/Users/username/extensions/my-extension",
-      "name": "My Extension"
-    },
-    {
-      "type": "github",
-      "repo": "owner/repo",
-      "name": "GitHub Extension",
-      "releaseTag": "v1.0.0"
-    },
-    {
-      "type": "store",
-      "id": "chrome-extension-id",
-      "name": "Store Extension"
+      "type": "bundled",
+      "name": "uBlock Origin",
+      "version": "1.50.0",
+      "description": "Ad blocker",
+      "files": {
+        "manifest.json": "H4sIAAAA...",
+        "background.js": "H4sIAAAA...",
+        "content.js": "H4sIAAAA..."
+      }
     }
   ]
 }
@@ -184,9 +212,68 @@ Pack files are JSON with `.extpack` extension:
 
 ### Extension Types
 
-- **`local`** - Extensions on your filesystem (auto-installed)
-- **`github`** - Extensions from GitHub releases (auto-downloaded)
-- **`store`** - Chrome Web Store extensions (manual install required)
+- **`bundled`** - All files embedded (gzipped + base64) - **Default for published packs**
+- **`local`** - Reference to local filesystem path
+- **`github`** - Reference to GitHub release
+- **`store`** - Reference to Chrome Web Store (manual install only)
+
+## 🌐 Registry
+
+The ext-pack registry is hosted on GitHub at [ext-pack/registry](https://github.com/ext-pack/registry).
+
+**How it works:**
+1. Packs are published as GitHub releases
+2. Registry index (`registry.json`) is updated via pull request
+3. GitHub Actions validates and auto-merges PRs
+4. GitHub Pages serves a web interface for browsing
+5. CLI fetches packs directly from GitHub releases
+
+**Benefits:**
+- ✅ Zero infrastructure cost
+- ✅ Distributed (uses GitHub's CDN)
+- ✅ Transparent (all PRs are public)
+- ✅ Reliable (backed by GitHub)
+- ✅ Fast (cached locally for 1 hour)
+
+Browse packs at: **https://ext-pack.github.io/registry** _(coming soon)_
+
+---
+
+## 🏗️ Architecture
+
+```
+ext-pack/
+├── bin/ext-pack.js          # CLI entry point (42 lines)
+├── src/
+│   ├── commands/            # Modular command system
+│   │   ├── create.js
+│   │   ├── install.js
+│   │   ├── publish.js
+│   │   ├── search.js
+│   │   └── ...
+│   ├── core/                # Business logic
+│   │   ├── bundle-codec.js  # Bundling with gzip
+│   │   ├── pack-codec.js    # Pack validation
+│   │   ├── pack-installer.js
+│   │   ├── registry-client.js
+│   │   └── github-publisher.js
+│   ├── ui/                  # Interactive wizards
+│   │   ├── create-wizard.js
+│   │   ├── install-wizard.js
+│   │   └── publish-wizard.js
+│   └── utils/               # Utilities
+│       ├── browser-detector.js
+│       ├── config-manager.js
+│       └── autocomplete.js
+```
+
+**Design principles:**
+- Modular commands - Each command is self-contained
+- Clean separation - Commands → Wizards → Core logic
+- Dual-mode - Interactive wizards OR direct commands
+- Zero legacy - Modern ESM, no backward compatibility
+
+---
 
 ## 🛠️ Configuration
 
@@ -225,84 +312,101 @@ Works on:
 - Linux ✅
 - Windows ✅
 
-## ⚠️ Known Limitations
+## 📝 FAQ
 
-- **Chrome Web Store extensions** - Cannot be auto-installed (Chrome restriction)
-- **Browser restart required** - Must close browser to install pack
-- **Chrome 137+ branded builds** - May deprecate `--load-extension` (Chromium/Brave unaffected)
-- **GitHub rate limits** - 60 requests/hour without token
+**Q: How is this different from sharing extension URLs?**
+A: ext-pack bundles ALL extension files into one portable file. Share one file instead of multiple URLs, and it works offline.
 
-## 🎨 UX Philosophy
+**Q: Does this work with Firefox?**
+A: Currently Chromium-based browsers only (Brave, Chrome, Edge, Chromium). Firefox support planned.
 
-**Zero Learning Curve** - Our core principle:
+**Q: Are my extensions uploaded anywhere?**
+A: When you publish, extensions are uploaded to GitHub releases. When you create a pack locally, files stay on your machine.
 
-- ✨ No commands to memorize
-- 🎯 Interactive menus for everything
-- 💡 Smart defaults (just press Enter)
-- 🔮 Auto-detect what you want to do
-- ❓ Helpful errors that suggest fixes
-- 🎨 Beautiful, emoji-rich output
+**Q: How big can packs be?**
+A: No hard limit, but GitHub releases have a 2GB limit. Most packs are 1-50MB after compression (60-70% reduction).
 
-## 📚 Examples
+**Q: Can I publish private packs?**
+A: Currently registry is public only. For private sharing, use `ext-pack share` to generate URLs or share the `.extpack` file directly.
 
-### Create Pack from Current Directory
-
-```bash
-cd ~/my-extensions
-ext-pack
-# Choose "Create a new extension pack"
-# Press Enter through defaults
-# Done!
-```
-
-### Install Pack
-
-```bash
-ext-pack my-pack.extpack
-# Confirm installation
-# Browser relaunches with extensions
-# That's it!
-```
-
-### Share Pack as URL
-
-```bash
-ext-pack
-# Choose "Share a pack"
-# Select pack to share
-# Choose "Generate shareable URL"
-# URL copied to clipboard!
-```
-
-## 🤝 Contributing
-
-Contributions welcome! This is a local-first tool with no backend.
-
-## 📝 License
-
-MIT
-
-## 💡 Tips
-
-- **First time?** Just run `ext-pack` and follow the tutorial
-- **Keyboard shortcuts?** None needed - use arrow keys and Enter
-- **Made a mistake?** Cancel anytime with Ctrl+C
-- **Need help?** Every screen has clear instructions
-
-## 🔗 Related Projects
-
-- [extension-pack-hub](../extension-pack-hub-archive/) - Original browser extension (archived)
-
-## 🙏 Credits
-
-Built with:
-- [inquirer](https://github.com/SBoudrias/Inquirer.js) - Interactive CLI
-- [ora](https://github.com/sindresorhus/ora) - Elegant spinners
-- [chalk](https://github.com/chalk/chalk) - Terminal colors
-- [boxen](https://github.com/sindresorhus/boxen) - Pretty boxes
-- [cli-progress](https://github.com/npkgz/cli-progress) - Progress bars
-- [qrcode-terminal](https://github.com/gtanner/qrcode-terminal) - QR codes
+**Q: How do updates work?**
+A: Coming soon: `ext-pack update <pack-name>` will check for new versions and update.
 
 ---
 
-**Made with ❤️ for developers who hate clicking "Load unpacked" repeatedly**
+## ⚠️ Known Limitations
+
+- **Chrome Web Store extensions** - Cannot be auto-installed (Chrome restriction)
+- **Browser restart required** - Must close browser to install extensions
+- **Chromium-only** - Firefox not yet supported
+- **GitHub rate limits** - 60 requests/hour without authentication
+
+
+## 🛠️ Development
+
+### Setup
+
+```bash
+git clone https://github.com/IFAKA/ext-pack.git
+cd ext-pack
+npm install
+npm link
+```
+
+### Commands
+
+```bash
+npm run dev              # Run CLI locally
+npm link                 # Install globally
+npm unlink -g ext-pack   # Remove global link
+```
+
+### Project Structure
+
+- `bin/` - CLI entry point
+- `src/commands/` - Command modules
+- `src/core/` - Core business logic
+- `src/ui/` - Interactive wizards
+- `src/utils/` - Shared utilities
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+**Publishing packs to the registry:**
+1. Create your pack locally (`ext-pack create`)
+2. Test it thoroughly (`ext-pack install your-pack.extpack`)
+3. Publish (`ext-pack publish your-pack.extpack`)
+4. Wait for auto-merge (~2 minutes)
+
+---
+
+## 📝 License
+
+MIT © [IFAKA](https://github.com/IFAKA)
+
+## 🙏 Acknowledgments
+
+Built with:
+- [commander.js](https://github.com/tj/commander.js) - CLI framework
+- [inquirer.js](https://github.com/SBoudrias/Inquirer.js) - Interactive prompts
+- [ora](https://github.com/sindresorhus/ora) - Elegant spinners
+- [chalk](https://github.com/chalk/chalk) - Terminal colors
+- [tabtab](https://github.com/mklabs/tabtab) - Shell autocomplete
+- [@octokit/rest](https://github.com/octokit/rest.js) - GitHub API client
+- [boxen](https://github.com/sindresorhus/boxen) - Pretty boxes
+- [qrcode-terminal](https://github.com/gtanner/qrcode-terminal) - QR codes
+
+Inspired by npm, homebrew, and other great package managers.
+
+---
+
+**Made with ❤️ for the browser extension community**

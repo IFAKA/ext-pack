@@ -5,9 +5,9 @@
 import inquirer from 'inquirer';
 import ora from 'ora';
 import cliProgress from 'cli-progress';
-import { resolve, basename } from 'path';
+import { resolve } from 'path';
 import { existsSync, readdirSync } from 'fs';
-import { colors, box, successBox, errorBox, formatPackSummary, clearScreen } from './helpers.js';
+import { colors, successBox, errorBox, formatPackSummary, clearScreen } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -21,11 +21,7 @@ import { getConfig } from '../utils/config-manager.js';
 export async function runInstallWizard(packFile = null) {
   clearScreen();
 
-  console.log(box(
-    colors.bold('⚡ Install Extension Pack\n\n') +
-    'Load extensions into your browser in one command',
-    { borderColor: 'blue' }
-  ));
+  console.log(colors.bold('\n  Install Extension Pack\n'));
 
   // Step 1: Get pack file
   let selectedPackFile = packFile;
@@ -59,10 +55,19 @@ export async function runInstallWizard(packFile = null) {
   }
 
   // Step 3: Show pack summary
-  console.log('\n' + box(
-    formatPackSummary(pack),
-    { borderColor: 'cyan', title: '📦 Pack Details' }
-  ));
+  console.log();
+  console.log(formatPackSummary(pack));
+  console.log();
+
+  // Show store extensions warning upfront if any
+  const storeExtensions = pack.extensions.filter(ext => ext.type === 'store');
+  if (storeExtensions.length > 0) {
+    console.log(colors.warning(`Note: ${storeExtensions.length} extension(s) require manual install from Chrome Web Store.`));
+    storeExtensions.forEach(ext => {
+      console.log(colors.muted(`  ${ext.name}${ext.id ? ` — chrome.google.com/webstore/detail/${ext.id}` : ''}`));
+    });
+    console.log();
+  }
 
   // Step 4: Confirm installation
   const { confirmInstall } = await inquirer.prompt([
@@ -83,15 +88,15 @@ export async function runInstallWizard(packFile = null) {
   const browser = await selectBrowser();
 
   if (!browser) {
-    console.log(errorBox('No supported browser found. Please install Brave, Chrome, or Chromium.'));
+    console.log(errorBox('No supported browser found. Install Brave, Chrome, or Chromium.'));
     return false;
   }
 
-  console.log(colors.info(`\nUsing: ${colors.highlight(browser.displayName)}\n`));
+  console.log(colors.muted(`\nUsing ${browser.displayName}\n`));
 
   // Step 6: Install pack
   const progressBar = new cliProgress.SingleBar({
-    format: colors.info('Installing') + ' |{bar}| {percentage}% | {extension}',
+    format: 'Installing |{bar}| {percentage}% | {extension}',
     barCompleteChar: '\u2588',
     barIncompleteChar: '\u2591',
     hideCursor: true
@@ -128,27 +133,15 @@ export async function runInstallWizard(packFile = null) {
   // Step 7: Show result
   if (result.success) {
     console.log(successBox(
-      `${result.extensionCount} extension(s) installed!\n\n` +
-      `${browser.displayName} has been relaunched with your extensions.`
+      `${result.extensionCount} extension(s) installed\n` +
+      `${browser.displayName} relaunched with extensions loaded.`
     ));
-
-    // Show manual instructions for store extensions
-    if (result.results.store && result.results.store.length > 0) {
-      console.log(colors.warning('\n⚠️  Some extensions require manual installation:\n'));
-      result.results.store.forEach(ext => {
-        console.log(colors.muted(`  • ${ext.extension.name}`));
-        if (ext.extension.id) {
-          console.log(colors.muted(`    https://chrome.google.com/webstore/detail/${ext.extension.id}`));
-        }
-      });
-      console.log();
-    }
 
     // Show errors if any
     if (result.results.errors && result.results.errors.length > 0) {
-      console.log(colors.error('\n❌ Some extensions failed to install:\n'));
+      console.log(colors.error('\nSome extensions failed to install:\n'));
       result.results.errors.forEach(err => {
-        console.log(colors.muted(`  • ${err.extension.name}: ${err.error}`));
+        console.log(colors.muted(`  ${err.extension.name}: ${err.error}`));
       });
       console.log();
     }
@@ -158,7 +151,7 @@ export async function runInstallWizard(packFile = null) {
     console.log(errorBox(result.message));
 
     if (result.reason === 'browser_running') {
-      console.log(colors.muted('\nTip: Close the browser and try again.\n'));
+      console.log(colors.muted('\nClose the browser and try again.\n'));
     }
 
     return false;
@@ -175,7 +168,6 @@ async function selectPackFile() {
   const files = readdirSync(cwd).filter(f => f.endsWith('.extpack'));
 
   if (files.length === 0) {
-    // Ask user to provide path
     const { filePath } = await inquirer.prompt([
       {
         type: 'input',
@@ -196,7 +188,6 @@ async function selectPackFile() {
     return filePath;
   }
 
-  // Let user select from found files
   const { selectedFile } = await inquirer.prompt([
     {
       type: 'list',
@@ -257,18 +248,16 @@ async function selectBrowser() {
   const preferred = getPreferredBrowser(config.browser.preference);
 
   if (preferred && !process.env.EXT_PACK_SELECT_BROWSER) {
-    // Use preferred without asking
     return preferred;
   }
 
-  // Ask user to select
   const { selectedBrowser } = await inquirer.prompt([
     {
       type: 'list',
       name: 'selectedBrowser',
       message: 'Select browser:',
       choices: browsers.map(b => ({
-        name: b.displayName + (b === preferred ? ' (preferred)' : ''),
+        name: b.displayName + (b === preferred ? colors.muted(' (preferred)') : ''),
         value: b.name
       }))
     }

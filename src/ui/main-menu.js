@@ -29,33 +29,33 @@ export async function showMainMenu() {
       message: 'What do you want to do?',
       choices: [
         {
-          name: colors.success('📦 Create a new extension pack'),
+          name: 'Create a new pack',
           value: MENU_CHOICES.CREATE,
-          short: 'Create pack'
+          short: 'Create'
         },
         {
-          name: colors.info('⚡ Install an extension pack'),
+          name: 'Install a pack',
           value: MENU_CHOICES.INSTALL,
-          short: 'Install pack'
+          short: 'Install'
         },
         {
-          name: colors.highlight('📋 List my installed packs'),
+          name: 'List installed packs',
           value: MENU_CHOICES.LIST,
-          short: 'List packs'
+          short: 'List'
         },
         {
-          name: colors.warning('🔗 Share a pack'),
+          name: 'Share a pack',
           value: MENU_CHOICES.SHARE,
-          short: 'Share pack'
+          short: 'Share'
         },
         new inquirer.Separator(),
         {
-          name: colors.muted('❓ Help & Tutorial'),
+          name: colors.muted('Help'),
           value: MENU_CHOICES.HELP,
           short: 'Help'
         },
         {
-          name: colors.muted('👋 Exit'),
+          name: colors.muted('Exit'),
           value: MENU_CHOICES.EXIT,
           short: 'Exit'
         }
@@ -67,7 +67,7 @@ export async function showMainMenu() {
 }
 
 /**
- * Handle menu action
+ * Handle menu action — returns to main menu automatically after each action
  * @param {string} action
  * @returns {Promise<void>}
  */
@@ -95,7 +95,7 @@ async function handleMenuAction(action) {
         break;
 
       case MENU_CHOICES.EXIT:
-        console.log(colors.success('\n👋 Goodbye!\n'));
+        console.log(colors.muted('\nGoodbye.\n'));
         process.exit(0);
         break;
 
@@ -103,46 +103,12 @@ async function handleMenuAction(action) {
         console.log(colors.error('Unknown action'));
         break;
     }
-
-    // After command completes, show "What next?" menu
-    await showWhatNext();
   } catch (error) {
-    console.error(colors.error('\n❌ Error:'), error.message);
-    await showWhatNext();
+    console.error(colors.error('\nError:'), error.message);
   }
-}
 
-/**
- * Show "What next?" menu
- * @returns {Promise<void>}
- */
-async function showWhatNext() {
-  console.log();
-
-  const { next } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'next',
-      message: 'What next?',
-      choices: [
-        {
-          name: 'Back to main menu',
-          value: 'menu'
-        },
-        {
-          name: 'Exit',
-          value: 'exit'
-        }
-      ]
-    }
-  ]);
-
-  if (next === 'menu') {
-    await showMainMenu();
-  } else {
-    console.log(colors.success('\n👋 Goodbye!\n'));
-    process.exit(0);
-  }
+  // Always return to main menu
+  await showMainMenu();
 }
 
 /**
@@ -153,39 +119,33 @@ async function showHelp() {
   clearScreen();
   printBanner();
 
-  console.log(colors.bold('📖 Help & Documentation\n'));
-
-  console.log(colors.highlight('Usage:'));
-  console.log('  ext-pack                 # Show interactive menu');
-  console.log('  ext-pack <file.extpack>  # Install a pack file');
+  console.log(colors.bold('Usage\n'));
+  console.log('  ext-pack                 Interactive menu');
+  console.log('  ext-pack <file.extpack>  Install a pack file');
   console.log();
 
-  console.log(colors.highlight('Creating Packs:'));
-  console.log('  1. Choose "Create a new extension pack"');
-  console.log('  2. Select a directory to scan');
-  console.log('  3. Choose which extensions to include');
-  console.log('  4. Save as .extpack file');
+  console.log(colors.bold('Creating Packs\n'));
+  console.log('  1. Select a directory to scan for extensions');
+  console.log('  2. Choose which extensions to include');
+  console.log('  3. Save as .extpack file');
   console.log();
 
-  console.log(colors.highlight('Installing Packs:'));
-  console.log('  1. Choose "Install an extension pack"');
-  console.log('  2. Select a pack file');
-  console.log('  3. Browser will relaunch with extensions');
+  console.log(colors.bold('Installing Packs\n'));
+  console.log('  1. Select a .extpack file');
+  console.log('  2. Browser relaunches with extensions loaded');
   console.log();
 
-  console.log(colors.highlight('Sharing Packs:'));
-  console.log('  1. Choose "Share a pack"');
-  console.log('  2. Select sharing method (URL, QR, file)');
-  console.log('  3. Send to others!');
+  console.log(colors.bold('Sharing Packs\n'));
+  console.log('  1. Select a pack');
+  console.log('  2. Choose method: URL, QR code, or file path');
   console.log();
 
-  console.log(colors.highlight('File Locations:'));
-  console.log(colors.muted('  Config: ~/.ext-pack/config.json'));
-  console.log(colors.muted('  Installed: ~/.ext-pack/installed.json'));
-  console.log(colors.muted('  Cache: ~/.ext-pack/downloads/'));
+  console.log(colors.bold('File Locations\n'));
+  console.log(colors.muted('  Config:    ~/.ext-pack/config.json'));
+  console.log(colors.muted('  Registry:  ~/.ext-pack/installed.json'));
+  console.log(colors.muted('  Cache:     ~/.ext-pack/downloads/'));
   console.log();
 
-  console.log(colors.highlight('Support:'));
-  console.log('  Report issues: https://github.com/anthropics/claude-code/issues');
-  console.log();
+  const { pause } = await import('./helpers.js');
+  await pause();
 }

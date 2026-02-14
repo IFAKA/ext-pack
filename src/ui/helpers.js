@@ -1,29 +1,19 @@
 import chalk from 'chalk';
 import boxen from 'boxen';
-import gradient from 'gradient-string';
 
 /**
- * Color helpers
+ * Color helpers — flat, terminal-native palette
  */
 export const colors = {
   success: chalk.green,
   error: chalk.red,
   warning: chalk.yellow,
-  info: chalk.blue,
-  muted: chalk.gray,
-  highlight: chalk.cyan,
-  bold: chalk.bold
+  info: chalk.white,
+  muted: chalk.dim,
+  highlight: chalk.bold.white,
+  bold: chalk.bold,
+  accent: chalk.white
 };
-
-/**
- * Create a nice header with gradient
- * @param {string} text
- * @returns {string}
- */
-export function header(text) {
-  const themed = gradient.pastel.multiline(text);
-  return themed;
-}
 
 /**
  * Create a boxed message
@@ -34,9 +24,10 @@ export function header(text) {
 export function box(message, options = {}) {
   const defaults = {
     padding: 1,
-    margin: 1,
+    margin: { top: 1, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
-    borderColor: 'cyan'
+    borderColor: 'white',
+    dimBorder: true
   };
 
   return boxen(message, { ...defaults, ...options });
@@ -48,9 +39,9 @@ export function box(message, options = {}) {
  * @returns {string}
  */
 export function successBox(message) {
-  return box(colors.success(message), {
+  return box(message, {
     borderColor: 'green',
-    title: '✅ Success'
+    dimBorder: false
   });
 }
 
@@ -62,7 +53,7 @@ export function successBox(message) {
 export function errorBox(message) {
   return box(colors.error(message), {
     borderColor: 'red',
-    title: '❌ Error'
+    dimBorder: false
   });
 }
 
@@ -74,7 +65,7 @@ export function errorBox(message) {
 export function warningBox(message) {
   return box(colors.warning(message), {
     borderColor: 'yellow',
-    title: '⚠️  Warning'
+    dimBorder: false
   });
 }
 
@@ -84,9 +75,9 @@ export function warningBox(message) {
  * @returns {string}
  */
 export function infoBox(message) {
-  return box(colors.info(message), {
-    borderColor: 'blue',
-    title: 'ℹ️  Info'
+  return box(message, {
+    borderColor: 'white',
+    dimBorder: true
   });
 }
 
@@ -97,11 +88,11 @@ export function infoBox(message) {
  */
 export function formatPackSummary(pack) {
   const lines = [
-    colors.bold(`Name: `) + pack.name,
-    colors.bold(`Description: `) + (pack.description || 'No description'),
-    colors.bold(`Author: `) + (pack.author || 'Unknown'),
-    colors.bold(`Extensions: `) + pack.extensions.length,
-    colors.bold(`Created: `) + (pack.created || 'Unknown')
+    colors.muted('Name:        ') + colors.highlight(pack.name),
+    colors.muted('Description: ') + (pack.description || 'No description'),
+    colors.muted('Author:      ') + (pack.author || 'Unknown'),
+    colors.muted('Extensions:  ') + pack.extensions.length,
+    colors.muted('Created:     ') + (pack.created || 'Unknown')
   ];
 
   return lines.join('\n');
@@ -117,7 +108,7 @@ export function formatExtensionList(extensions) {
     const num = colors.muted(`${i + 1}.`);
     const name = colors.highlight(ext.name);
     const version = ext.version ? colors.muted(`v${ext.version}`) : '';
-    const type = colors.muted(`(${ext.type || 'local'})`);
+    const type = colors.muted(`[${ext.type || 'local'}]`);
 
     return `  ${num} ${name} ${version} ${type}`;
   }).join('\n');
@@ -131,20 +122,16 @@ export function clearScreen() {
 }
 
 /**
- * Print banner
+ * Print banner — clean, flat, no rainbow
  */
 export function printBanner() {
-  const banner = `
-███████╗██╗  ██╗████████╗      ██████╗  █████╗  ██████╗██╗  ██╗
-██╔════╝╚██╗██╔╝╚══██╔══╝      ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
-█████╗   ╚███╔╝    ██║   █████╗██████╔╝███████║██║     █████╔╝
-██╔══╝   ██╔██╗    ██║   ╚════╝██╔═══╝ ██╔══██║██║     ██╔═██╗
-███████╗██╔╝ ██╗   ██║         ██║     ██║  ██║╚██████╗██║  ██╗
-╚══════╝╚═╝  ╚═╝   ╚═╝         ╚═╝     ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
-`;
+  const banner = colors.bold.white(
+    '\n  ext-pack'
+  );
+  const tagline = colors.muted('  Bundle and install browser extensions\n');
 
-  console.log(header(banner));
-  console.log(colors.muted('         Bundle and install extensions with zero friction\n'));
+  console.log(banner);
+  console.log(tagline);
 }
 
 /**

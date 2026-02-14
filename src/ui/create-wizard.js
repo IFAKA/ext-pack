@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
-import { colors, box, successBox, formatExtensionList, clearScreen } from './helpers.js';
+import { colors, successBox, clearScreen } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
@@ -19,11 +19,7 @@ import { getPlatform } from '../utils/browser-detector.js';
 export async function runCreateWizard() {
   clearScreen();
 
-  console.log(box(
-    colors.bold('📦 Create Extension Pack\n\n') +
-    'Bundle your local extensions into a shareable pack',
-    { borderColor: 'green' }
-  ));
+  console.log(colors.bold('\n  Create Extension Pack\n'));
 
   // Step 1: Get pack name
   const { packName } = await inquirer.prompt([
@@ -54,7 +50,7 @@ export async function runCreateWizard() {
 
   if (candidates.length > 0) {
     const choices = candidates.map(c => ({
-      name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} — ${colors.muted(c.path)}`,
+      name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} ${colors.muted('—')} ${colors.muted(c.path)}`,
       value: c.path,
       short: c.label
     }));
@@ -106,13 +102,13 @@ export async function runCreateWizard() {
   spinner.stop();
 
   if (extensions.length === 0) {
-    console.log(colors.error('\n❌ No valid extensions found in this directory.'));
-    console.log(colors.muted('\nExtensions must have a manifest.json file at their root.\n'));
+    console.log(colors.error('\nNo valid extensions found in this directory.'));
+    console.log(colors.muted('Extensions must have a manifest.json file at their root.\n'));
 
     if (errors.length > 0) {
       console.log(colors.warning('Errors encountered:'));
       errors.forEach(err => {
-        console.log(colors.muted(`  • ${err.path}: ${err.error}`));
+        console.log(colors.muted(`  ${err.path}: ${err.error}`));
       });
       console.log();
     }
@@ -120,19 +116,19 @@ export async function runCreateWizard() {
     return null;
   }
 
-  console.log(colors.success(`\n✓ Found ${extensions.length} extension(s)\n`));
+  console.log(colors.success(`\nFound ${extensions.length} extension(s)\n`));
 
   // Show extensions with descriptions
   extensions.forEach((ext, i) => {
     const num = colors.muted(`${i + 1}.`);
     const name = colors.highlight(ext.name);
     const version = colors.muted(`v${ext.version}`);
-    const desc = ext.description ? colors.muted(`\n   ${ext.description}`) : '';
+    const desc = ext.description ? colors.muted(`\n     ${ext.description}`) : '';
     console.log(`  ${num} ${name} ${version}${desc}`);
   });
   console.log();
 
-  // Step 4: Select extensions to include
+  // Step 4: Select extensions to include — ALL CHECKED BY DEFAULT
   const { selectedIndexes } = await inquirer.prompt([
     {
       type: 'checkbox',
@@ -141,7 +137,7 @@ export async function runCreateWizard() {
       choices: extensions.map((ext, i) => ({
         name: `${ext.name} (v${ext.version})`,
         value: i,
-        checked: false
+        checked: true
       })),
       validate: (answer) => {
         if (answer.length === 0) {
@@ -179,7 +175,7 @@ export async function runCreateWizard() {
       type: 'input',
       name: 'description',
       message: 'Pack description (optional):',
-      default: generatedDescription || `${selectedExtensions.length} essential browser extensions`
+      default: generatedDescription || `${selectedExtensions.length} browser extensions`
     },
     {
       type: 'input',
@@ -213,59 +209,19 @@ export async function runCreateWizard() {
 
   try {
     await writePackFile(resolve(outputFile), pack);
-    saveSpinner.succeed('Pack saved!');
+    saveSpinner.succeed('Pack saved');
 
     console.log(successBox(
-      `Pack created: ${colors.highlight(outputFile)}\n\n` +
-      `Extensions: ${colors.bold(selectedExtensions.length)}\n` +
-      `Created: ${colors.muted(pack.created)}`
+      `${colors.highlight(outputFile)}\n\n` +
+      `${selectedExtensions.length} extension(s) | ${pack.created}`
     ));
 
     return outputFile;
   } catch (err) {
     saveSpinner.fail('Failed to save pack');
-    console.error(colors.error(`\n❌ Error: ${err.message}\n`));
+    console.error(colors.error(`\nError: ${err.message}\n`));
     return null;
   }
-}
-
-/**
- * Show "What next?" menu after creating a pack
- * @param {string} packFile - Path to created pack file
- * @returns {Promise<string>} Next action
- */
-export async function showCreateWhatNext(packFile) {
-  const { action } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'action',
-      message: 'What next?',
-      choices: [
-        {
-          name: colors.success('⚡ Install this pack now'),
-          value: 'install',
-          short: 'Install'
-        },
-        {
-          name: colors.warning('🔗 Share this pack'),
-          value: 'share',
-          short: 'Share'
-        },
-        {
-          name: colors.info('📦 Create another pack'),
-          value: 'create',
-          short: 'Create another'
-        },
-        {
-          name: colors.muted('← Back to main menu'),
-          value: 'menu',
-          short: 'Main menu'
-        }
-      ]
-    }
-  ]);
-
-  return action;
 }
 
 /**
@@ -370,6 +326,5 @@ async function generateDescription(extensions) {
 }
 
 export default {
-  runCreateWizard,
-  showCreateWhatNext
+  runCreateWizard
 };

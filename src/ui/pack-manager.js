@@ -3,7 +3,7 @@
  */
 
 import inquirer from 'inquirer';
-import { colors, box, formatPackSummary, timeAgo, clearScreen } from './helpers.js';
+import { colors, formatPackSummary, timeAgo, clearScreen } from './helpers.js';
 import { getInstalledPacks, removeInstalledPack } from '../utils/config-manager.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { existsSync } from 'fs';
@@ -15,39 +15,32 @@ import { existsSync } from 'fs';
 export async function runPackManager() {
   clearScreen();
 
-  console.log(box(
-    colors.bold('📋 Your Extension Packs\n\n') +
-    'View and manage installed packs',
-    { borderColor: 'cyan' }
-  ));
+  console.log(colors.bold('\n  Installed Packs\n'));
 
   const registry = getInstalledPacks();
 
   if (registry.packs.length === 0) {
-    console.log(colors.muted('\nNo packs installed yet.\n'));
-    console.log(colors.info('Create your first pack by selecting "Create a new extension pack" from the main menu.\n'));
+    console.log(colors.muted('  No packs installed yet.\n'));
     return;
   }
 
   // Show pack list
-  console.log();
   registry.packs.forEach((pack, i) => {
     const num = colors.muted(`${i + 1}.`);
     const name = colors.highlight(pack.name);
     const extCount = colors.muted(`(${pack.extensions.length} extensions)`);
-    const installed = pack.installed ? colors.muted(`• Installed ${timeAgo(pack.installed)}`) : '';
+    const installed = pack.installed ? colors.muted(`installed ${timeAgo(pack.installed)}`) : '';
 
-    console.log(`  ${num} ${name} ${extCount}`);
-    console.log(`     ${installed}`);
-    console.log();
+    console.log(`  ${num} ${name} ${extCount} ${installed}`);
   });
+  console.log();
 
   // Ask what to do
   const { action } = await inquirer.prompt([
     {
       type: 'list',
       name: 'action',
-      message: 'What do you want to do?',
+      message: 'Action:',
       choices: [
         {
           name: 'View pack details',
@@ -63,7 +56,7 @@ export async function runPackManager() {
         },
         new inquirer.Separator(),
         {
-          name: colors.muted('← Back to main menu'),
+          name: colors.muted('Back'),
           value: 'back'
         }
       ]
@@ -91,25 +84,21 @@ export async function runPackManager() {
 
 /**
  * View pack details
- * @param {Array} packs - Array of installed packs
- * @returns {Promise<void>}
  */
 async function viewPackDetails(packs) {
   const { selectedPack } = await inquirer.prompt([
     {
       type: 'list',
       name: 'selectedPack',
-      message: 'Select pack to view:',
+      message: 'Select pack:',
       choices: packs.map((pack, i) => ({
-        name: `${pack.name} (${pack.extensions.length} extensions)`,
+        name: `${pack.name} ${colors.muted(`(${pack.extensions.length} extensions)`)}`,
         value: i
       }))
     }
   ]);
 
   const pack = packs[selectedPack];
-
-  clearScreen();
 
   // Try to read full pack details from file
   let fullPack = null;
@@ -121,61 +110,26 @@ async function viewPackDetails(packs) {
     }
   }
 
-  console.log(box(
-    formatPackSummary(fullPack || pack),
-    { borderColor: 'cyan', title: '📦 Pack Details' }
-  ));
+  console.log();
+  console.log(formatPackSummary(fullPack || pack));
+  console.log();
 
-  console.log(colors.bold('\nExtensions:\n'));
+  console.log(colors.bold('Extensions:\n'));
   pack.extensions.forEach((ext, i) => {
     const num = colors.muted(`  ${i + 1}.`);
     const name = colors.highlight(ext.name);
-    const status = ext.status === 'loaded' ? colors.success('✓') : colors.muted('○');
-    const path = colors.muted(`\n     ${ext.path}`);
+    const status = ext.status === 'loaded' ? colors.success('*') : colors.muted('-');
+    const path = colors.muted(ext.path);
 
-    console.log(`${status} ${num} ${name}${path}`);
+    console.log(`  ${status} ${num} ${name}`);
+    console.log(`       ${path}`);
   });
 
   console.log();
-
-  // Show actions
-  const { action } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'action',
-      message: 'What next?',
-      choices: [
-        {
-          name: 'Reinstall this pack',
-          value: 'reinstall'
-        },
-        {
-          name: 'Remove this pack',
-          value: 'remove'
-        },
-        new inquirer.Separator(),
-        {
-          name: colors.muted('← Back to pack list'),
-          value: 'back'
-        }
-      ]
-    }
-  ]);
-
-  if (action === 'reinstall') {
-    await reinstallPack(packs, selectedPack);
-  } else if (action === 'remove') {
-    await removePack(packs, selectedPack);
-  } else if (action === 'back') {
-    await runPackManager();
-  }
 }
 
 /**
  * Reinstall a pack
- * @param {Array} packs - Array of packs
- * @param {number} preselected - Preselected pack index
- * @returns {Promise<void>}
  */
 async function reinstallPack(packs, preselected = null) {
   let selectedIndex = preselected;
@@ -199,21 +153,17 @@ async function reinstallPack(packs, preselected = null) {
   const pack = packs[selectedIndex];
 
   if (!pack.file || !existsSync(pack.file)) {
-    console.log(colors.error('\n❌ Pack file not found. Cannot reinstall.\n'));
-    console.log(colors.muted(`Expected location: ${pack.file}\n`));
+    console.log(colors.error('\nPack file not found. Cannot reinstall.'));
+    console.log(colors.muted(`Expected: ${pack.file}\n`));
     return;
   }
 
-  // Use install command
   const { installCommand } = await import('../commands/install.js');
   await installCommand(pack.file);
 }
 
 /**
  * Remove a pack from registry
- * @param {Array} packs - Array of packs
- * @param {number} preselected - Preselected pack index
- * @returns {Promise<void>}
  */
 async function removePack(packs, preselected = null) {
   let selectedIndex = preselected;
@@ -247,8 +197,8 @@ async function removePack(packs, preselected = null) {
 
   if (confirm) {
     removeInstalledPack(pack.name);
-    console.log(colors.success(`\n✓ Removed "${pack.name}" from registry.\n`));
-    console.log(colors.muted('Note: Extensions are still loaded in your browser.\n'));
+    console.log(colors.success(`\nRemoved "${pack.name}" from registry.`));
+    console.log(colors.muted('Extensions remain loaded in browser until restart.\n'));
   } else {
     console.log(colors.muted('\nCancelled.\n'));
   }

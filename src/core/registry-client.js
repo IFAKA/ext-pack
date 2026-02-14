@@ -4,7 +4,7 @@
 
 import { colors } from '../ui/helpers.js';
 
-const REGISTRY_URL = 'https://raw.githubusercontent.com/ext-pack/registry/main/registry.json';
+const REGISTRY_URL = 'https://raw.githubusercontent.com/IFAKA/ext-pack-registry/main/registry.json';
 const CACHE_TTL = 3600000; // 1 hour
 
 let cachedRegistry = null;

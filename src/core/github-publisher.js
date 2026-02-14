@@ -7,8 +7,8 @@ import fs from 'fs-extra';
 import { readPackFile } from './pack-codec.js';
 import { calculateBundleSize } from './bundle-codec.js';
 
-const REGISTRY_OWNER = 'ext-pack';
-const REGISTRY_REPO = 'registry';
+const REGISTRY_OWNER = 'IFAKA';
+const REGISTRY_REPO = 'ext-pack-registry';
 
 /**
  * Get GitHub token from environment or gh CLI

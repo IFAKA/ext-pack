@@ -5,16 +5,12 @@
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import inquirer from 'inquirer';
-import inquirerDirectory from 'inquirer-directory';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
 import { colors, successBox, clearScreen } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
-
-// Register directory selector plugin
-inquirer.registerPrompt('directory', inquirerDirectory);
 
 /**
  * Run the create pack wizard
@@ -47,7 +43,7 @@ export async function runCreateWizard() {
   // Step 2: Detect extension directories
   const detectSpinner = ora('Looking for extensions...').start();
 
-  const candidates = await detectExtensionDirs();
+  const candidates = detectExtensionDirs();
   detectSpinner.stop();
 
   let scanDir;
@@ -72,38 +68,16 @@ export async function runCreateWizard() {
     if (selectedDir === '__custom__') {
       const { customDir } = await inquirer.prompt([
         {
-          type: 'directory',
+          type: 'input',
           name: 'customDir',
-          message: 'Select directory to scan:',
-          basePath: homedir(),
-          options: {
-            filter: (path) => {
-              const base = basename(path);
-              // Ignore common directories that should be excluded
-              const ignoreDirs = [
-                'node_modules',
-                '.git',
-                '.next',
-                '.nuxt',
-                'dist',
-                'build',
-                'coverage',
-                '.cache',
-                '.vscode',
-                '.idea',
-                '.DS_Store',
-                'vendor',
-                '__pycache__',
-                '.pytest_cache',
-                'venv',
-                '.venv',
-                'target',
-                'out',
-                'bin',
-                'obj'
-              ];
-              return !ignoreDirs.includes(base);
+          message: 'Enter directory path to scan:',
+          default: homedir(),
+          validate: (input) => {
+            const path = resolve(input);
+            if (!existsSync(path)) {
+              return 'Directory does not exist';
             }
+            return true;
           }
         }
       ]);
@@ -112,41 +86,19 @@ export async function runCreateWizard() {
       scanDir = selectedDir;
     }
   } else {
-    console.log(colors.muted('No extensions auto-detected, browse to select a directory.\n'));
+    console.log(colors.muted('No extensions auto-detected.\n'));
     const { customDir } = await inquirer.prompt([
       {
-        type: 'directory',
+        type: 'input',
         name: 'customDir',
-        message: 'Select directory to scan for extensions:',
-        basePath: homedir(),
-        options: {
-          filter: (path) => {
-            const base = basename(path);
-            // Ignore common directories that should be excluded
-            const ignoreDirs = [
-              'node_modules',
-              '.git',
-              '.next',
-              '.nuxt',
-              'dist',
-              'build',
-              'coverage',
-              '.cache',
-              '.vscode',
-              '.idea',
-              '.DS_Store',
-              'vendor',
-              '__pycache__',
-              '.pytest_cache',
-              'venv',
-              '.venv',
-              'target',
-              'out',
-              'bin',
-              'obj'
-            ];
-            return !ignoreDirs.includes(base);
+        message: 'Enter directory path to scan for extensions:',
+        default: homedir(),
+        validate: (input) => {
+          const path = resolve(input);
+          if (!existsSync(path)) {
+            return 'Directory does not exist';
           }
+          return true;
         }
       }
     ]);
@@ -157,7 +109,7 @@ export async function runCreateWizard() {
   const spinner = ora('Scanning for extensions...').start();
 
   const scanPath = resolve(scanDir);
-  const { extensions, errors } = await scanDirectory(scanPath);
+  const { extensions, errors } = scanDirectory(scanPath);
 
   spinner.stop();
 
@@ -311,12 +263,12 @@ const EXTENSION_DIRS = {
 /**
  * Detect directories that contain extensions
  */
-async function detectExtensionDirs() {
+function detectExtensionDirs() {
   const results = [];
 
   // Check cwd first
   const cwd = process.cwd();
-  const cwdScan = await scanDirectory(cwd, { maxDepth: 2 });
+  const cwdScan = scanDirectory(cwd, { maxDepth: 2 });
   if (cwdScan.extensions.length > 0) {
     results.push({ label: 'Current directory', path: cwd, count: cwdScan.extensions.length });
   }
@@ -327,7 +279,7 @@ async function detectExtensionDirs() {
 
   for (const dir of knownDirs) {
     if (existsSync(dir.path)) {
-      const scan = await scanDirectory(dir.path, { maxDepth: 2 });
+      const scan = scanDirectory(dir.path, { maxDepth: 2 });
       if (scan.extensions.length > 0) {
         results.push({ label: dir.label, path: dir.path, count: scan.extensions.length });
       }

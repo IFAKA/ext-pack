@@ -67,7 +67,7 @@ function resolveI18nMessage(text, extensionPath, manifest) {
  * @param {Object} options - Scan options
  * @returns {Array<Object>} Array of found extensions
  */
-export async function scanDirectory(rootPath, options = {}) {
+export function scanDirectory(rootPath, options = {}) {
   const {
     maxDepth = 3,
     excludeDirs = [

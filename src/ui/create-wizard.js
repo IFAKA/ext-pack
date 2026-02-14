@@ -5,12 +5,16 @@
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import inquirer from 'inquirer';
+import inquirerDirectory from 'inquirer-directory';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
 import { colors, successBox, clearScreen } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
+
+// Register directory selector plugin
+inquirer.registerPrompt('directory', inquirerDirectory);
 
 /**
  * Run the create pack wizard
@@ -54,7 +58,7 @@ export async function runCreateWizard() {
       value: c.path,
       short: c.label
     }));
-    choices.push({ name: colors.muted('Enter a custom path...'), value: '__custom__', short: 'Custom' });
+    choices.push({ name: colors.muted('Browse for a directory...'), value: '__custom__', short: 'Custom' });
 
     const { selectedDir } = await inquirer.prompt([
       {
@@ -68,11 +72,10 @@ export async function runCreateWizard() {
     if (selectedDir === '__custom__') {
       const { customDir } = await inquirer.prompt([
         {
-          type: 'input',
+          type: 'directory',
           name: 'customDir',
-          message: 'Directory to scan:',
-          default: process.cwd(),
-          validate: (input) => existsSync(input) ? true : 'Directory does not exist'
+          message: 'Select directory to scan:',
+          basePath: process.cwd()
         }
       ]);
       scanDir = customDir;
@@ -80,14 +83,13 @@ export async function runCreateWizard() {
       scanDir = selectedDir;
     }
   } else {
-    console.log(colors.muted('No extensions auto-detected, enter a path manually.\n'));
+    console.log(colors.muted('No extensions auto-detected, browse to select a directory.\n'));
     const { customDir } = await inquirer.prompt([
       {
-        type: 'input',
+        type: 'directory',
         name: 'customDir',
-        message: 'Directory to scan for extensions:',
-        default: process.cwd(),
-        validate: (input) => existsSync(input) ? true : 'Directory does not exist'
+        message: 'Select directory to scan for extensions:',
+        basePath: process.cwd()
       }
     ]);
     scanDir = customDir;

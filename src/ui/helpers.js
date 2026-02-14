@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 import boxen from 'boxen';
+import { readdirSync } from 'fs';
+import { join, relative } from 'path';
 
 /**
  * Color helpers — flat, terminal-native palette
@@ -176,4 +178,134 @@ export async function pause(message = 'Press Enter to continue...') {
       message: colors.muted(message)
     }
   ]);
+}
+
+/**
+ * Directories to ignore during recursive search
+ */
+const IGNORED_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.next',
+  '.svelte-kit',
+  '.nuxt',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.cache',
+  '.turbo',
+  '.vscode',
+  '.idea',
+  '__pycache__',
+  'venv',
+  '.env',
+  'vendor',
+  'target',
+  'bin',
+  'obj',
+  '.gradle',
+  '.m2',
+  'bower_components',
+  '.DS_Store',
+  'tmp',
+  'temp',
+  '.meteor',
+  '.Trash',
+  'Library',
+  'Applications'
+]);
+
+/**
+ * Recursively find all directories, ignoring common build/dependency folders
+ * @param {string} dir - Directory to search
+ * @param {number} maxDepth - Maximum recursion depth
+ * @param {number} currentDepth - Current depth (internal use)
+ * @returns {Array<string>} List of directory paths
+ */
+function findAllDirectories(dir, maxDepth = 5, currentDepth = 0) {
+  if (currentDepth >= maxDepth) return [];
+
+  const dirs = [dir]; // Include current directory
+
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (IGNORED_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith('.')) continue; // Skip hidden dirs
+
+      const fullPath = join(dir, entry.name);
+
+      // Add this directory
+      dirs.push(fullPath);
+
+      // Recursively search subdirectories
+      const subdirs = findAllDirectories(fullPath, maxDepth, currentDepth + 1);
+      dirs.push(...subdirs);
+    }
+  } catch (err) {
+    // Skip directories we can't read
+  }
+
+  return dirs;
+}
+
+/**
+ * Interactive fuzzy directory finder
+ * Recursively searches entire directory tree with fuzzy matching
+ * @param {string} message - Prompt message
+ * @param {string} basePath - Starting directory path
+ * @returns {Promise<string>} Selected directory path
+ */
+export async function browseDirectory(message, basePath) {
+  const inquirer = (await import('inquirer')).default;
+  const autocomplete = (await import('inquirer-autocomplete-prompt')).default;
+  const ora = (await import('ora')).default;
+
+  // Register autocomplete prompt
+  inquirer.registerPrompt('autocomplete', autocomplete);
+
+  // Scan for all directories
+  const spinner = ora('Scanning directories...').start();
+  const allDirs = findAllDirectories(basePath);
+  spinner.stop();
+
+  console.log(colors.muted(`Found ${allDirs.length} directories\n`));
+
+  // Create searchable choices with relative paths for display
+  const choices = allDirs.map(dir => ({
+    name: dir === basePath ? '.' : relative(basePath, dir),
+    value: dir
+  }));
+
+  // Sort by depth (shallower first) and then alphabetically
+  choices.sort((a, b) => {
+    const depthA = a.name.split('/').length;
+    const depthB = b.name.split('/').length;
+    if (depthA !== depthB) return depthA - depthB;
+    return a.name.localeCompare(b.name);
+  });
+
+  const { directory } = await inquirer.prompt([
+    {
+      type: 'autocomplete',
+      name: 'directory',
+      message,
+      source: async (_answersSoFar, input) => {
+        if (!input) return choices;
+
+        // Fuzzy search: filter choices that contain the input (case-insensitive)
+        const filtered = choices.filter(choice =>
+          choice.name.toLowerCase().includes(input.toLowerCase())
+        );
+
+        return filtered;
+      },
+      pageSize: 15
+    }
+  ]);
+
+  return directory;
 }

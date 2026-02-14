@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
-import { colors, successBox, clearScreen } from './helpers.js';
+import { colors, successBox, clearScreen, browseDirectory } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
@@ -66,43 +66,13 @@ export async function runCreateWizard() {
     ]);
 
     if (selectedDir === '__custom__') {
-      const { customDir } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'customDir',
-          message: 'Enter directory path to scan:',
-          default: homedir(),
-          validate: (input) => {
-            const path = resolve(input);
-            if (!existsSync(path)) {
-              return 'Directory does not exist';
-            }
-            return true;
-          }
-        }
-      ]);
-      scanDir = customDir;
+      scanDir = await browseDirectory('Browse for directory to scan:', homedir());
     } else {
       scanDir = selectedDir;
     }
   } else {
     console.log(colors.muted('No extensions auto-detected.\n'));
-    const { customDir } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'customDir',
-        message: 'Enter directory path to scan for extensions:',
-        default: homedir(),
-        validate: (input) => {
-          const path = resolve(input);
-          if (!existsSync(path)) {
-            return 'Directory does not exist';
-          }
-          return true;
-        }
-      }
-    ]);
-    scanDir = customDir;
+    scanDir = await browseDirectory('Browse for directory to scan:', homedir());
   }
 
   // Step 3: Scan selected directory

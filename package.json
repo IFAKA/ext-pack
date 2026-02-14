@@ -30,7 +30,7 @@
     "find-process": "^1.4.7",
     "fs-extra": "^11.2.0",
     "inquirer": "^9.2.0",
-    "inquirer-directory": "^2.2.0",
+    "inquirer-autocomplete-prompt": "^3.0.1",
     "node-fetch": "^3.3.0",
     "ora": "^7.0.0",
     "qrcode-terminal": "^0.12.0",

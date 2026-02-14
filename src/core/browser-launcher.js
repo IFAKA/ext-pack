@@ -185,10 +185,3 @@ export async function relaunchBrowser(browser, extensionPaths, options = {}) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export default {
-  isBrowserRunning,
-  killBrowser,
-  launchBrowser,
-  relaunchBrowser
-};

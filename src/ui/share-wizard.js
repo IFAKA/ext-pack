@@ -5,10 +5,9 @@
 import inquirer from 'inquirer';
 import qrcode from 'qrcode-terminal';
 import { resolve, basename } from 'path';
-import { existsSync, readdirSync } from 'fs';
-import { colors, successBox, clearScreen } from './helpers.js';
+import { existsSync } from 'fs';
+import { colors, successBox, clearScreen, copyToClipboardMac, selectPackFile } from './helpers.js';
 import { readPackFile, generateUrl } from '../core/pack-codec.js';
-import { getInstalledPacks } from '../utils/config-manager.js';
 
 /**
  * Run the share wizard
@@ -24,7 +23,7 @@ export async function runShareWizard(packFile = null) {
   let selectedPackFile = packFile;
 
   if (!selectedPackFile) {
-    selectedPackFile = await selectPackFile();
+    selectedPackFile = await selectPackFile('Select pack to share:', true);
     if (!selectedPackFile) {
       return;
     }
@@ -124,23 +123,7 @@ async function shareAsUrl(pack, packPath) {
     colors.muted('Or visit the URL in a browser')
   ));
 
-  // Copy to clipboard (macOS)
-  if (process.platform === 'darwin') {
-    const { copyToClipboard } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'copyToClipboard',
-        message: 'Copy URL to clipboard?',
-        default: true
-      }
-    ]);
-
-    if (copyToClipboard) {
-      const { exec } = await import('child_process');
-      exec(`echo "${url}" | pbcopy`);
-      console.log(colors.success('\nCopied to clipboard.\n'));
-    }
-  }
+  await copyToClipboardMac(url, 'Copy URL to clipboard?');
 }
 
 /**
@@ -171,98 +154,6 @@ async function shareAsPath(packPath) {
     colors.muted('Install: ext-pack ' + basename(packPath))
   ));
 
-  // Copy to clipboard (macOS)
-  if (process.platform === 'darwin') {
-    const { copyToClipboard } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'copyToClipboard',
-        message: 'Copy path to clipboard?',
-        default: true
-      }
-    ]);
-
-    if (copyToClipboard) {
-      const { exec } = await import('child_process');
-      exec(`echo "${packPath}" | pbcopy`);
-      console.log(colors.success('\nCopied to clipboard.\n'));
-    }
-  }
+  await copyToClipboardMac(packPath, 'Copy path to clipboard?');
 }
 
-/**
- * Select a pack file interactively
- */
-async function selectPackFile() {
-  const registry = getInstalledPacks();
-
-  const cwd = process.cwd();
-  const localFiles = existsSync(cwd)
-    ? readdirSync(cwd).filter(f => f.endsWith('.extpack'))
-    : [];
-
-  const choices = [];
-
-  if (registry.packs.length > 0) {
-    choices.push(new inquirer.Separator(colors.muted('Installed:')));
-    registry.packs.forEach(pack => {
-      if (pack.file && existsSync(pack.file)) {
-        choices.push({
-          name: `${pack.name} ${colors.muted(`(${pack.extensions.length} extensions)`)}`,
-          value: pack.file
-        });
-      }
-    });
-  }
-
-  if (localFiles.length > 0) {
-    choices.push(new inquirer.Separator(colors.muted('Current directory:')));
-    localFiles.forEach(file => {
-      choices.push({
-        name: file,
-        value: file
-      });
-    });
-  }
-
-  if (choices.length > 0) {
-    choices.push(new inquirer.Separator());
-  }
-  choices.push({
-    name: colors.muted('Enter custom path...'),
-    value: '__custom__'
-  });
-
-  const { selectedFile } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'selectedFile',
-      message: 'Select pack to share:',
-      choices
-    }
-  ]);
-
-  if (selectedFile === '__custom__') {
-    const { filePath } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'filePath',
-        message: 'Path to pack file:',
-        validate: (input) => {
-          if (!input) {
-            return 'Pack file path is required';
-          }
-          return true;
-        }
-      }
-    ]);
-
-    return filePath;
-  }
-
-  return selectedFile;
-}
-
-export default {
-  runShareWizard
-};

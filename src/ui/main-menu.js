@@ -1,9 +1,9 @@
 import inquirer from 'inquirer';
 import { colors, printBanner, clearScreen } from './helpers.js';
-import { createCommand } from '../commands/create.js';
-import { installCommand } from '../commands/install.js';
-import { listCommand } from '../commands/list.js';
-import { shareCommand } from '../commands/share.js';
+import { runCreateWizard } from './create-wizard.js';
+import { runInstallWizard } from './install-wizard.js';
+import { runShareWizard } from './share-wizard.js';
+import { runPackManager } from './pack-manager.js';
 
 const MENU_CHOICES = {
   CREATE: 'create',
@@ -75,19 +75,19 @@ async function handleMenuAction(action) {
   try {
     switch (action) {
       case MENU_CHOICES.CREATE:
-        await createCommand();
+        await runCreateWizard();
         break;
 
       case MENU_CHOICES.INSTALL:
-        await installCommand();
+        await runInstallWizard();
         break;
 
       case MENU_CHOICES.LIST:
-        await listCommand();
+        await runPackManager();
         break;
 
       case MENU_CHOICES.SHARE:
-        await shareCommand();
+        await runShareWizard();
         break;
 
       case MENU_CHOICES.HELP:

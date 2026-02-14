@@ -203,7 +203,3 @@ async function removePack(packs, preselected = null) {
     console.log(colors.muted('\nCancelled.\n'));
   }
 }
-
-export default {
-  runPackManager
-};

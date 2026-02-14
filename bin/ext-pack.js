@@ -6,7 +6,7 @@ import { existsSync } from 'fs';
 import { showMainMenu } from '../src/ui/main-menu.js';
 import { checkFirstRun } from '../src/utils/config-manager.js';
 import { showOnboarding } from '../src/ui/onboarding.js';
-import { installCommand } from '../src/commands/install.js';
+import { runInstallWizard } from '../src/ui/install-wizard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +21,7 @@ async function main() {
     // Check if it's a pack file
     if (filePath.endsWith('.extpack') && existsSync(filePath)) {
       // Auto-detect pack file and offer to install
-      await installCommand(filePath);
+      await runInstallWizard(filePath);
       return;
     }
 

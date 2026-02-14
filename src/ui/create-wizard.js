@@ -306,7 +306,3 @@ async function generateDescription(extensions) {
     return null;
   }
 }
-
-export default {
-  runCreateWizard
-};

@@ -6,8 +6,8 @@ import inquirer from 'inquirer';
 import ora from 'ora';
 import cliProgress from 'cli-progress';
 import { resolve } from 'path';
-import { existsSync, readdirSync } from 'fs';
-import { colors, successBox, errorBox, formatPackSummary, clearScreen } from './helpers.js';
+import { existsSync } from 'fs';
+import { colors, successBox, errorBox, formatPackSummary, clearScreen, selectPackFile } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -157,77 +157,6 @@ export async function runInstallWizard(packFile = null) {
     return false;
   }
 }
-
-/**
- * Select a pack file interactively
- * @returns {Promise<string|null>}
- */
-async function selectPackFile() {
-  // Look for .extpack files in current directory
-  const cwd = process.cwd();
-  const files = readdirSync(cwd).filter(f => f.endsWith('.extpack'));
-
-  if (files.length === 0) {
-    const { filePath } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'filePath',
-        message: 'Path to pack file:',
-        validate: (input) => {
-          if (!input) {
-            return 'Pack file path is required';
-          }
-          if (!input.endsWith('.extpack')) {
-            return 'File must have .extpack extension';
-          }
-          return true;
-        }
-      }
-    ]);
-
-    return filePath;
-  }
-
-  const { selectedFile } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'selectedFile',
-      message: 'Select pack file:',
-      choices: [
-        ...files.map(f => ({
-          name: f,
-          value: f
-        })),
-        new inquirer.Separator(),
-        {
-          name: colors.muted('Enter custom path...'),
-          value: '__custom__'
-        }
-      ]
-    }
-  ]);
-
-  if (selectedFile === '__custom__') {
-    const { filePath } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'filePath',
-        message: 'Path to pack file:',
-        validate: (input) => {
-          if (!input) {
-            return 'Pack file path is required';
-          }
-          return true;
-        }
-      }
-    ]);
-
-    return filePath;
-  }
-
-  return selectedFile;
-}
-
 /**
  * Select browser to use
  * @returns {Promise<Object|null>}
@@ -265,7 +194,3 @@ async function selectBrowser() {
 
   return browsers.find(b => b.name === selectedBrowser);
 }
-
-export default {
-  runInstallWizard
-};

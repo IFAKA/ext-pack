@@ -228,10 +228,3 @@ export function isExtensionDir(dirPath) {
     return false;
   }
 }
-
-export default {
-  scanDirectory,
-  validateExtension,
-  getExtensionInfo,
-  isExtensionDir
-};

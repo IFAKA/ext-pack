@@ -162,15 +162,3 @@ export async function writePackFile(filePath, pack) {
 
   await fs.writeJson(filePath, pack, { spaces: 2 });
 }
-
-export default {
-  encode,
-  decode,
-  generateUrl,
-  parseUrl,
-  createPack,
-  validate,
-  upgrade,
-  readPackFile,
-  writePackFile
-};

@@ -18,70 +18,36 @@ export const colors = {
 };
 
 /**
- * Create a boxed message
- * @param {string} message
- * @param {Object} options
+ * Create a boxed message with color styling
+ * @param {string} message - Message to display
+ * @param {'success'|'error'|'warning'|'info'} type - Box type
  * @returns {string}
  */
-export function box(message, options = {}) {
-  const defaults = {
+function coloredBox(message, type = 'info') {
+  const configs = {
+    success: { color: null, borderColor: 'green', dimBorder: false },
+    error: { color: colors.error, borderColor: 'red', dimBorder: false },
+    warning: { color: colors.warning, borderColor: 'yellow', dimBorder: false },
+    info: { color: null, borderColor: 'white', dimBorder: true }
+  };
+
+  const cfg = configs[type];
+  const msg = cfg.color ? cfg.color(message) : message;
+
+  return boxen(msg, {
     padding: 1,
     margin: { top: 1, bottom: 1, left: 0, right: 0 },
     borderStyle: 'round',
-    borderColor: 'white',
-    dimBorder: true
-  };
-
-  return boxen(message, { ...defaults, ...options });
-}
-
-/**
- * Success box
- * @param {string} message
- * @returns {string}
- */
-export function successBox(message) {
-  return box(message, {
-    borderColor: 'green',
-    dimBorder: false
+    borderColor: cfg.borderColor,
+    dimBorder: cfg.dimBorder
   });
 }
 
-/**
- * Error box
- * @param {string} message
- * @returns {string}
- */
-export function errorBox(message) {
-  return box(colors.error(message), {
-    borderColor: 'red',
-    dimBorder: false
-  });
-}
-
-/**
- * Warning box
- * @param {string} message
- * @returns {string}
- */
-export function warningBox(message) {
-  return box(colors.warning(message), {
-    borderColor: 'yellow',
-    dimBorder: false
-  });
-}
-
-/**
- * Info box
- * @param {string} message
- * @returns {string}
- */
-export function infoBox(message) {
-  return box(message, {
-    borderColor: 'white',
-    dimBorder: true
-  });
-}
+// Exported box variants
+export const successBox = (msg) => coloredBox(msg, 'success');
+export const errorBox = (msg) => coloredBox(msg, 'error');
+export const warningBox = (msg) => coloredBox(msg, 'warning');
+export const infoBox = (msg) => coloredBox(msg, 'info');
 
 /**
  * Format pack summary
@@ -178,6 +144,133 @@ export async function pause(message = 'Press Enter to continue...') {
       message: colors.muted(message)
     }
   ]);
+}
+
+/**
+ * Copy text to clipboard on macOS (prompts user first)
+ * @param {string} text - Text to copy
+ * @param {string} promptMessage - Confirmation prompt message
+ * @returns {Promise<boolean>} Whether text was copied
+ */
+export async function copyToClipboardMac(text, promptMessage = 'Copy to clipboard?') {
+  if (process.platform !== 'darwin') return false;
+
+  const inquirer = (await import('inquirer')).default;
+  const { exec } = await import('child_process');
+
+  const { confirmed } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirmed',
+      message: promptMessage,
+      default: true
+    }
+  ]);
+
+  if (confirmed) {
+    exec(`echo "${text}" | pbcopy`);
+    console.log(colors.success('\nCopied to clipboard.\n'));
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Select a pack file interactively
+ * @param {string} promptMessage - Prompt message
+ * @param {boolean} showInstalled - Include installed packs from registry
+ * @returns {Promise<string|null>} Selected pack file path or null
+ */
+export async function selectPackFile(promptMessage = 'Select pack file:', showInstalled = false) {
+  const inquirer = (await import('inquirer')).default;
+  const { existsSync, readdirSync } = await import('fs');
+
+  const choices = [];
+
+  // Add installed packs if requested
+  if (showInstalled) {
+    const { getInstalledPacks } = await import('../utils/config-manager.js');
+    const registry = getInstalledPacks();
+
+    if (registry.packs.length > 0) {
+      choices.push(new inquirer.Separator(colors.muted('Installed:')));
+      registry.packs.forEach(pack => {
+        if (pack.file && existsSync(pack.file)) {
+          choices.push({
+            name: `${pack.name} ${colors.muted(`(${pack.extensions.length} extensions)`)}`,
+            value: pack.file
+          });
+        }
+      });
+    }
+  }
+
+  // Add local .extpack files from current directory
+  const cwd = process.cwd();
+  const localFiles = existsSync(cwd)
+    ? readdirSync(cwd).filter(f => f.endsWith('.extpack'))
+    : [];
+
+  if (localFiles.length > 0) {
+    if (choices.length > 0) {
+      choices.push(new inquirer.Separator(colors.muted('Current directory:')));
+    }
+    localFiles.forEach(file => {
+      choices.push({ name: file, value: file });
+    });
+  }
+
+  // If no choices, ask for custom path directly
+  if (choices.length === 0) {
+    const { filePath } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'filePath',
+        message: 'Path to pack file:',
+        validate: (input) => {
+          if (!input) return 'Pack file path is required';
+          if (!input.endsWith('.extpack')) return 'File must have .extpack extension';
+          return true;
+        }
+      }
+    ]);
+    return filePath;
+  }
+
+  // Add custom path option
+  choices.push(new inquirer.Separator());
+  choices.push({
+    name: colors.muted('Enter custom path...'),
+    value: '__custom__'
+  });
+
+  const { selectedFile } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedFile',
+      message: promptMessage,
+      choices
+    }
+  ]);
+
+  // Handle custom path
+  if (selectedFile === '__custom__') {
+    const { filePath } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'filePath',
+        message: 'Path to pack file:',
+        validate: (input) => {
+          if (!input) return 'Pack file path is required';
+          return true;
+        }
+      }
+    ]);
+    return filePath;
+  }
+
+  return selectedFile;
 }
 
 /**

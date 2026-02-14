@@ -225,8 +225,3 @@ export async function installPack(packFilePath, browser, options = {}) {
     extensionCount: extensionPaths.length
   };
 }
-
-export default {
-  processPack,
-  installPack
-};

@@ -230,15 +230,3 @@ export async function findExtensionDir(extractedPath) {
 
   throw new Error('Could not find manifest.json in extracted release');
 }
-
-export default {
-  getLatestRelease,
-  getReleaseByTag,
-  getAssetDownloadUrl,
-  parseRepo,
-  checkRepoExists,
-  getManifestPermissions,
-  analyzePermissions,
-  downloadRelease,
-  findExtensionDir
-};

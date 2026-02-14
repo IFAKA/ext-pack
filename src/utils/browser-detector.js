@@ -80,8 +80,24 @@ export function getBrowserProcessNames() {
 }
 
 /**
+ * Build a browser object with all metadata
+ * @param {string} name - Browser name
+ * @param {string} path - Browser executable path
+ * @param {string} processName - Browser process name
+ * @returns {Object} Browser object
+ */
+function buildBrowserObject(name, path, processName) {
+  return {
+    name,
+    path,
+    processName,
+    displayName: name.charAt(0).toUpperCase() + name.slice(1)
+  };
+}
+
+/**
  * Detect all installed browsers
- * @returns {Array<Object>} Array of {name, path, processName}
+ * @returns {Array<Object>} Array of {name, path, processName, displayName}
  */
 export function detectBrowsers() {
   const paths = getBrowserPaths();
@@ -90,12 +106,7 @@ export function detectBrowsers() {
 
   for (const [name, path] of Object.entries(paths)) {
     if (existsSync(path)) {
-      installed.push({
-        name,
-        path,
-        processName: processNames[name],
-        displayName: name.charAt(0).toUpperCase() + name.slice(1)
-      });
+      installed.push(buildBrowserObject(name, path, processNames[name]));
     }
   }
 
@@ -140,12 +151,7 @@ export function getBrowser(name) {
     return null;
   }
 
-  return {
-    name,
-    path,
-    processName: processNames[name],
-    displayName: name.charAt(0).toUpperCase() + name.slice(1)
-  };
+  return buildBrowserObject(name, path, processNames[name]);
 }
 
 /**
@@ -158,13 +164,3 @@ export function isBrowserInstalled(name) {
   const path = paths[name];
   return path && existsSync(path);
 }
-
-export default {
-  getPlatform,
-  getBrowserPaths,
-  getBrowserProcessNames,
-  detectBrowsers,
-  getPreferredBrowser,
-  getBrowser,
-  isBrowserInstalled
-};

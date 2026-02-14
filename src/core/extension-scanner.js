@@ -70,7 +70,27 @@ function resolveI18nMessage(text, extensionPath, manifest) {
 export async function scanDirectory(rootPath, options = {}) {
   const {
     maxDepth = 3,
-    excludeDirs = ['node_modules', '.git', 'dist', 'build', '.next']
+    excludeDirs = [
+      'node_modules',
+      '.git',
+      '.next',
+      '.nuxt',
+      'dist',
+      'build',
+      'coverage',
+      '.cache',
+      '.vscode',
+      '.idea',
+      'vendor',
+      '__pycache__',
+      '.pytest_cache',
+      'venv',
+      '.venv',
+      'target',
+      'out',
+      'bin',
+      'obj'
+    ]
   } = options;
 
   const extensions = [];

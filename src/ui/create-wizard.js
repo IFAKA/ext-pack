@@ -75,7 +75,36 @@ export async function runCreateWizard() {
           type: 'directory',
           name: 'customDir',
           message: 'Select directory to scan:',
-          basePath: process.cwd()
+          basePath: homedir(),
+          options: {
+            filter: (path) => {
+              const base = basename(path);
+              // Ignore common directories that should be excluded
+              const ignoreDirs = [
+                'node_modules',
+                '.git',
+                '.next',
+                '.nuxt',
+                'dist',
+                'build',
+                'coverage',
+                '.cache',
+                '.vscode',
+                '.idea',
+                '.DS_Store',
+                'vendor',
+                '__pycache__',
+                '.pytest_cache',
+                'venv',
+                '.venv',
+                'target',
+                'out',
+                'bin',
+                'obj'
+              ];
+              return !ignoreDirs.includes(base);
+            }
+          }
         }
       ]);
       scanDir = customDir;
@@ -89,7 +118,36 @@ export async function runCreateWizard() {
         type: 'directory',
         name: 'customDir',
         message: 'Select directory to scan for extensions:',
-        basePath: process.cwd()
+        basePath: homedir(),
+        options: {
+          filter: (path) => {
+            const base = basename(path);
+            // Ignore common directories that should be excluded
+            const ignoreDirs = [
+              'node_modules',
+              '.git',
+              '.next',
+              '.nuxt',
+              'dist',
+              'build',
+              'coverage',
+              '.cache',
+              '.vscode',
+              '.idea',
+              '.DS_Store',
+              'vendor',
+              '__pycache__',
+              '.pytest_cache',
+              'venv',
+              '.venv',
+              'target',
+              'out',
+              'bin',
+              'obj'
+            ];
+            return !ignoreDirs.includes(base);
+          }
+        }
       }
     ]);
     scanDir = customDir;

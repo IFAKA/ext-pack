@@ -5,27 +5,27 @@
 Once pushed to GitHub, anyone can install with:
 
 ```bash
-npm install -g https://github.com/IFAKA/browser-extensions/tarball/main#egg=ext-pack
+npm install -g https://github.com/IFAKA/ext-pack/tarball/master
 ```
 
 **Or even simpler with npx (no install):**
 
 ```bash
-npx github:IFAKA/browser-extensions/ext-pack
+npx github:IFAKA/ext-pack
 ```
 
 ## Option 2: Clone and Install
 
 ```bash
-git clone https://github.com/IFAKA/browser-extensions.git
-cd browser-extensions/ext-pack
+git clone https://github.com/IFAKA/ext-pack.git
+cd ext-pack
 ./install.sh
 ```
 
 ## Option 3: Quick One-Liner (Downloads and Installs)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/IFAKA/browser-extensions/master/ext-pack/install.sh | bash
+curl -sL https://raw.githubusercontent.com/IFAKA/ext-pack/master/install.sh | bash
 ```
 
 ⚠️ **Security Note:** Only run curl | bash from sources you trust!

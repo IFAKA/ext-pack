@@ -40,7 +40,7 @@ $ ext-pack
 ### ⚡ One-Command Install (No Cloning Required)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/IFAKA/browser-extensions/master/install-ext-pack.sh | bash
+curl -sL https://raw.githubusercontent.com/IFAKA/ext-pack/master/install.sh | bash
 ```
 
 Then run: `ext-pack`

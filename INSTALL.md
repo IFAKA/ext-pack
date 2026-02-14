@@ -25,7 +25,7 @@ cd ext-pack
 ## Option 3: Quick One-Liner (Downloads and Installs)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/IFAKA/ext-pack/master/install.sh | bash
+curl -sL https://raw.githubusercontent.com/IFAKA/ext-pack/main/install.sh | bash
 ```
 
 ⚠️ **Security Note:** Only run curl | bash from sources you trust!

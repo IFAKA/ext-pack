@@ -1,25 +1,17 @@
 /**
- * Publish command - Publish pack to registry (Phase 3)
+ * Publish command - Publish pack to registry
  */
 
 import { Command } from 'commander';
-import { colors } from '../ui/helpers.js';
+import { runPublishWizard } from '../ui/publish-wizard.js';
 
 export const publishCommand = new Command('publish')
-  .argument('<pack>', 'Pack file path')
-  .description('Publish pack to registry')
+  .argument('[pack]', 'Pack file path')
+  .description('Publish pack to GitHub registry')
   .option('--tag <tag>', 'Version tag (default: auto-increment)')
   .option('--public', 'Make pack public (default: true)', true)
-  .action(async () => {
-    // Phase 3 implementation
-    console.log(colors.bold('\n📦 Publishing to Registry\n'));
-    console.log(colors.muted('This feature will be available in Phase 3.\n'));
-    console.log('Planned features:');
-    console.log('  • Publish to GitHub-based registry');
-    console.log('  • Automatic versioning');
-    console.log('  • Public/private packs');
-    console.log('  • Download analytics');
-    console.log('  • Web-based pack browser\n');
+  .action(async (pack, options) => {
+    await runPublishWizard(pack, options);
   });
 
 export default publishCommand;

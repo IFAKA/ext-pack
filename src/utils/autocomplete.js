@@ -68,16 +68,28 @@ export async function handleCompletion() {
 
   // Complete pack names for install/share commands
   if (['install', 'share'].includes(env.prev)) {
-    // For now, complete with .extpack files in current directory
-    // In Phase 3, this will fetch from registry
-    const { readdirSync } = await import('fs');
-
+    // Try to get popular packs from registry
     try {
+      const { getPopularPacks } = await import('../core/registry-client.js');
+      const popularPacks = await getPopularPacks(10);
+
+      // Also include local .extpack files
+      const { readdirSync } = await import('fs');
       const files = readdirSync(process.cwd());
       const extpackFiles = files.filter(f => f.endsWith('.extpack'));
-      return tabtab.log(extpackFiles);
+
+      // Combine registry packs and local files
+      return tabtab.log([...popularPacks, ...extpackFiles]);
     } catch {
-      return tabtab.log([]);
+      // Fallback to local files only
+      try {
+        const { readdirSync } = await import('fs');
+        const files = readdirSync(process.cwd());
+        const extpackFiles = files.filter(f => f.endsWith('.extpack'));
+        return tabtab.log(extpackFiles);
+      } catch {
+        return tabtab.log([]);
+      }
     }
   }
 

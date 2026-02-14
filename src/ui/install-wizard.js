@@ -5,13 +5,15 @@
 import inquirer from 'inquirer';
 import ora from 'ora';
 import cliProgress from 'cli-progress';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 import { existsSync } from 'fs';
+import { tmpdir } from 'os';
 import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, selectPackFile, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
 import { getConfig } from '../utils/config-manager.js';
+import { getPackInfo, downloadPack, isRegistryAccessible } from '../core/registry-client.js';
 
 /**
  * Run the install pack wizard
@@ -23,8 +25,10 @@ export async function runInstallWizard(packFile = null) {
 
   console.log(colors.bold('\n  Install Extension Pack\n'));
 
-  // Step 1: Get pack file
+  // Step 1: Get pack file or name
   let selectedPackFile = packFile;
+  let packPath = null;
+  let isFromRegistry = false;
 
   if (!selectedPackFile) {
     selectedPackFile = await selectPackFile();
@@ -33,13 +37,66 @@ export async function runInstallWizard(packFile = null) {
     }
   }
 
-  // Resolve path
-  const packPath = resolve(selectedPackFile);
+  // Detect if it's a registry name or file path
+  if (!selectedPackFile.endsWith('.extpack') && !existsSync(selectedPackFile)) {
+    // Might be a registry pack name
+    const checkSpinner = ora('Checking registry...').start();
 
-  if (!existsSync(packPath)) {
-    console.log(errorBox(`Pack file not found: ${packPath}`));
-    await pause();
-    return false;
+    try {
+      const accessible = await isRegistryAccessible();
+
+      if (!accessible) {
+        checkSpinner.fail('Registry not accessible');
+        console.log(errorBox(
+          'Cannot connect to registry.\n\n' +
+          'If you meant to install a local file, make sure the path is correct.'
+        ));
+        await pause();
+        return false;
+      }
+
+      const packInfo = await getPackInfo(selectedPackFile);
+
+      if (!packInfo) {
+        checkSpinner.fail('Pack not found');
+        console.log(errorBox(
+          `Pack "${selectedPackFile}" not found in registry.\n\n` +
+          'Try searching: ext-pack search <query>'
+        ));
+        await pause();
+        return false;
+      }
+
+      checkSpinner.succeed(`Found pack: ${packInfo.name}`);
+      isFromRegistry = true;
+
+      // Download pack to temp directory
+      const tempDir = tmpdir();
+      packPath = join(tempDir, `${packInfo.id}.extpack`);
+
+      const downloadSpinner = ora('Downloading pack...').start();
+
+      await downloadPack(packInfo.id, packPath, (progress) => {
+        downloadSpinner.text = `Downloading... ${progress.progress}%`;
+      });
+
+      downloadSpinner.succeed('Pack downloaded');
+
+    } catch (error) {
+      checkSpinner.fail('Failed to fetch from registry');
+      console.log(errorBox(`Error: ${error.message}`));
+      await pause();
+      return false;
+    }
+  } else {
+    // Local file path
+    packPath = resolve(selectedPackFile);
+
+    if (!existsSync(packPath)) {
+      console.log(errorBox(`Pack file not found: ${packPath}`));
+      await pause();
+      return false;
+    }
   }
 
   // Step 2: Read and validate pack

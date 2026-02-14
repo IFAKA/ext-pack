@@ -3,12 +3,14 @@
  */
 
 import { existsSync } from 'fs';
+import { homedir } from 'os';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
 import { colors, box, successBox, formatExtensionList, clearScreen } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
+import { getPlatform } from '../utils/browser-detector.js';
 
 /**
  * Run the create pack wizard
@@ -42,23 +44,60 @@ export async function runCreateWizard() {
     }
   ]);
 
-  // Step 2: Ask for scan directory
-  const { scanDir } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'scanDir',
-      message: 'Directory to scan for extensions:',
-      default: process.cwd(),
-      validate: (input) => {
-        if (!existsSync(input)) {
-          return 'Directory does not exist';
-        }
-        return true;
-      }
-    }
-  ]);
+  // Step 2: Detect extension directories
+  const detectSpinner = ora('Looking for extensions...').start();
 
-  // Step 3: Scan for extensions
+  const candidates = await detectExtensionDirs();
+  detectSpinner.stop();
+
+  let scanDir;
+
+  if (candidates.length > 0) {
+    const choices = candidates.map(c => ({
+      name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} — ${colors.muted(c.path)}`,
+      value: c.path,
+      short: c.label
+    }));
+    choices.push({ name: colors.muted('Enter a custom path...'), value: '__custom__', short: 'Custom' });
+
+    const { selectedDir } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'selectedDir',
+        message: 'Where to scan for extensions:',
+        choices
+      }
+    ]);
+
+    if (selectedDir === '__custom__') {
+      const { customDir } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'customDir',
+          message: 'Directory to scan:',
+          default: process.cwd(),
+          validate: (input) => existsSync(input) ? true : 'Directory does not exist'
+        }
+      ]);
+      scanDir = customDir;
+    } else {
+      scanDir = selectedDir;
+    }
+  } else {
+    console.log(colors.muted('No extensions auto-detected, enter a path manually.\n'));
+    const { customDir } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'customDir',
+        message: 'Directory to scan for extensions:',
+        default: process.cwd(),
+        validate: (input) => existsSync(input) ? true : 'Directory does not exist'
+      }
+    ]);
+    scanDir = customDir;
+  }
+
+  // Step 3: Scan selected directory
   const spinner = ora('Scanning for extensions...').start();
 
   const scanPath = resolve(scanDir);
@@ -102,7 +141,7 @@ export async function runCreateWizard() {
       choices: extensions.map((ext, i) => ({
         name: `${ext.name} (v${ext.version})`,
         value: i,
-        checked: true
+        checked: false
       })),
       validate: (answer) => {
         if (answer.length === 0) {
@@ -115,13 +154,32 @@ export async function runCreateWizard() {
 
   const selectedExtensions = selectedIndexes.map(i => extensions[i]);
 
-  // Step 5: Get pack description and author
+  // Step 5: Optionally generate description with Ollama
+  let generatedDescription = null;
+  const ollamaAvailable = await isOllamaRunning();
+
+  if (ollamaAvailable) {
+    const { useOllama } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'useOllama',
+        message: 'Generate description with Ollama?',
+        default: false
+      }
+    ]);
+
+    if (useOllama) {
+      generatedDescription = await generateDescription(selectedExtensions);
+    }
+  }
+
+  // Step 6: Get pack description and author
   const { description, author } = await inquirer.prompt([
     {
       type: 'input',
       name: 'description',
       message: 'Pack description (optional):',
-      default: `${selectedExtensions.length} essential browser extensions`
+      default: generatedDescription || `${selectedExtensions.length} essential browser extensions`
     },
     {
       type: 'input',
@@ -131,7 +189,7 @@ export async function runCreateWizard() {
     }
   ]);
 
-  // Step 6: Choose output location
+  // Step 7: Choose output location
   const defaultFileName = `${packName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
   const { outputFile } = await inquirer.prompt([
     {
@@ -208,6 +266,107 @@ export async function showCreateWhatNext(packFile) {
   ]);
 
   return action;
+}
+
+/**
+ * Known browser extension directories per platform
+ */
+const EXTENSION_DIRS = {
+  darwin: [
+    { label: 'Brave', path: join(homedir(), 'Library/Application Support/BraveSoftware/Brave-Browser/Default/Extensions') },
+    { label: 'Chrome', path: join(homedir(), 'Library/Application Support/Google/Chrome/Default/Extensions') },
+    { label: 'Chromium', path: join(homedir(), 'Library/Application Support/Chromium/Default/Extensions') },
+    { label: 'Edge', path: join(homedir(), 'Library/Application Support/Microsoft Edge/Default/Extensions') }
+  ],
+  linux: [
+    { label: 'Brave', path: join(homedir(), '.config/BraveSoftware/Brave-Browser/Default/Extensions') },
+    { label: 'Chrome', path: join(homedir(), '.config/google-chrome/Default/Extensions') },
+    { label: 'Chromium', path: join(homedir(), '.config/chromium/Default/Extensions') },
+    { label: 'Edge', path: join(homedir(), '.config/microsoft-edge/Default/Extensions') }
+  ],
+  win32: [
+    { label: 'Brave', path: join(process.env.LOCALAPPDATA || '', 'BraveSoftware/Brave-Browser/User Data/Default/Extensions') },
+    { label: 'Chrome', path: join(process.env.LOCALAPPDATA || '', 'Google/Chrome/User Data/Default/Extensions') },
+    { label: 'Chromium', path: join(process.env.LOCALAPPDATA || '', 'Chromium/User Data/Default/Extensions') },
+    { label: 'Edge', path: join(process.env.LOCALAPPDATA || '', 'Microsoft/Edge/User Data/Default/Extensions') }
+  ]
+};
+
+/**
+ * Detect directories that contain extensions
+ */
+async function detectExtensionDirs() {
+  const results = [];
+
+  // Check cwd first
+  const cwd = process.cwd();
+  const cwdScan = await scanDirectory(cwd, { maxDepth: 2 });
+  if (cwdScan.extensions.length > 0) {
+    results.push({ label: 'Current directory', path: cwd, count: cwdScan.extensions.length });
+  }
+
+  // Check known browser extension dirs
+  const platform = getPlatform();
+  const knownDirs = EXTENSION_DIRS[platform] || [];
+
+  for (const dir of knownDirs) {
+    if (existsSync(dir.path)) {
+      const scan = await scanDirectory(dir.path, { maxDepth: 2 });
+      if (scan.extensions.length > 0) {
+        results.push({ label: dir.label, path: dir.path, count: scan.extensions.length });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Check if Ollama is running locally
+ */
+async function isOllamaRunning() {
+  try {
+    const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Generate a pack description using Ollama
+ */
+async function generateDescription(extensions) {
+  const extList = extensions.map(e => `${e.name}: ${e.description || 'no description'}`).join(', ');
+  const prompt = `Write a single short sentence (under 15 words) describing this browser extension pack containing: ${extList}. Reply with only the sentence, no quotes.`;
+
+  const spinner = ora('Generating description...').start();
+
+  try {
+    const res = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama3.2',
+        prompt,
+        stream: false
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!res.ok) {
+      spinner.fail('Failed to generate description');
+      return null;
+    }
+
+    const data = await res.json();
+    const text = data.response?.trim();
+    spinner.succeed('Description generated');
+    return text || null;
+  } catch {
+    spinner.fail('Failed to generate description');
+    return null;
+  }
 }
 
 export default {

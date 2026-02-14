@@ -2,8 +2,64 @@
  * Extension scanner - Find and validate browser extensions in directories
  */
 
-import { readdirSync, statSync, readFileSync } from 'fs';
+import { readdirSync, statSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+
+/**
+ * Resolve Chrome i18n message placeholder
+ * @param {string} text - Text that may contain __MSG_*__ placeholder
+ * @param {string} extensionPath - Path to extension directory
+ * @param {Object} manifest - Parsed manifest object
+ * @returns {string} Resolved text or original if not a placeholder
+ */
+function resolveI18nMessage(text, extensionPath, manifest) {
+  if (!text || typeof text !== 'string') return text;
+
+  // Check if it's an i18n placeholder
+  const match = text.match(/^__MSG_(.+)__$/);
+  if (!match) return text;
+
+  const messageKey = match[1];
+
+  // Determine locale to use (default_locale or 'en')
+  const locale = manifest.default_locale || 'en';
+
+  // Try to read messages.json
+  const messagesPath = join(extensionPath, '_locales', locale, 'messages.json');
+
+  try {
+    if (existsSync(messagesPath)) {
+      const messagesContent = readFileSync(messagesPath, 'utf-8');
+      const messages = JSON.parse(messagesContent);
+
+      if (messages[messageKey] && messages[messageKey].message) {
+        return messages[messageKey].message;
+      }
+    }
+  } catch (err) {
+    // Silently fail and return original text
+  }
+
+  // Fallback: try 'en' if default_locale was different
+  if (locale !== 'en') {
+    const enMessagesPath = join(extensionPath, '_locales', 'en', 'messages.json');
+    try {
+      if (existsSync(enMessagesPath)) {
+        const messagesContent = readFileSync(enMessagesPath, 'utf-8');
+        const messages = JSON.parse(messagesContent);
+
+        if (messages[messageKey] && messages[messageKey].message) {
+          return messages[messageKey].message;
+        }
+      }
+    } catch (err) {
+      // Silently fail and return original text
+    }
+  }
+
+  // Return original if resolution failed
+  return text;
+}
 
 /**
  * Recursively scan directory for extensions
@@ -101,13 +157,13 @@ export function validateExtension(extensionPath) {
       };
     }
 
-    // Extract metadata
+    // Extract metadata and resolve i18n messages
     const extension = {
       type: 'local',
       path: extensionPath,
-      name: manifest.name,
+      name: resolveI18nMessage(manifest.name, extensionPath, manifest),
       version: manifest.version,
-      description: manifest.description || null,
+      description: resolveI18nMessage(manifest.description, extensionPath, manifest),
       manifestVersion: manifest.manifest_version,
       permissions: [
         ...(manifest.permissions || []),

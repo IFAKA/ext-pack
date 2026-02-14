@@ -141,18 +141,31 @@ export async function publishPack(packPath, options = {}) {
   // Update metadata with download URL
   metadata.url = asset.browser_download_url;
 
-  // Fork registry repo if not already forked
-  await forkRegistryRepo(octokit, username);
+  // Determine if we need to fork or branch
+  const needsFork = username !== REGISTRY_OWNER;
 
-  // Update registry.json via PR
-  const prUrl = await updateRegistryViaPR(octokit, username, metadata);
+  if (needsFork) {
+    // Fork registry repo if not already forked
+    await forkRegistryRepo(octokit, username);
+    // Update registry.json via PR from fork
+    const prUrl = await updateRegistryViaPR(octokit, username, metadata, needsFork);
+    return {
+      releaseUrl: release.html_url,
+      downloadUrl: asset.browser_download_url,
+      prUrl,
+      metadata
+    };
+  } else {
+    // Same owner - create branch and PR
+    const prUrl = await updateRegistryViaBranch(octokit, metadata);
+    return {
+      releaseUrl: release.html_url,
+      downloadUrl: asset.browser_download_url,
+      prUrl,
+      metadata
+    };
+  }
 
-  return {
-    releaseUrl: release.html_url,
-    downloadUrl: asset.browser_download_url,
-    prUrl,
-    metadata
-  };
 }
 
 /**
@@ -184,13 +197,94 @@ async function forkRegistryRepo(octokit, username) {
 }
 
 /**
- * Update registry.json via pull request
+ * Update registry.json via branch (for same owner)
  * @param {Octokit} octokit - Octokit instance
- * @param {string} username - GitHub username
  * @param {Object} metadata - Pack metadata
  * @returns {Promise<string>} PR URL
  */
-async function updateRegistryViaPR(octokit, username, metadata) {
+async function updateRegistryViaBranch(octokit, metadata) {
+  const branchName = `add-${metadata.id}-${Date.now()}`;
+
+  // Get main branch ref
+  const { data: mainRef } = await octokit.git.getRef({
+    owner: REGISTRY_OWNER,
+    repo: REGISTRY_REPO,
+    ref: 'heads/main'
+  });
+
+  // Create new branch
+  await octokit.git.createRef({
+    owner: REGISTRY_OWNER,
+    repo: REGISTRY_REPO,
+    ref: `refs/heads/${branchName}`,
+    sha: mainRef.object.sha
+  });
+
+  // Get current registry.json
+  const { data: file } = await octokit.repos.getContent({
+    owner: REGISTRY_OWNER,
+    repo: REGISTRY_REPO,
+    path: 'registry.json',
+    ref: branchName
+  });
+
+  // Decode and parse registry
+  const registryContent = Buffer.from(file.content, 'base64').toString('utf-8');
+  const registry = JSON.parse(registryContent);
+
+  // Add/update pack
+  registry.packs[metadata.id] = metadata;
+  registry.updated = new Date().toISOString();
+
+  // Encode updated registry
+  const newContent = JSON.stringify(registry, null, 2);
+  const newContentBase64 = Buffer.from(newContent, 'utf-8').toString('base64');
+
+  // Update file in branch
+  await octokit.repos.createOrUpdateFileContents({
+    owner: REGISTRY_OWNER,
+    repo: REGISTRY_REPO,
+    path: 'registry.json',
+    message: `Add ${metadata.name} v${metadata.version}`,
+    content: newContentBase64,
+    sha: file.sha,
+    branch: branchName
+  });
+
+  // Wait for commit to be processed
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  // Create pull request
+  const { data: pr } = await octokit.pulls.create({
+    owner: REGISTRY_OWNER,
+    repo: REGISTRY_REPO,
+    title: `Add ${metadata.name} v${metadata.version}`,
+    head: branchName,
+    base: 'main',
+    body: `## ${metadata.name}
+
+${metadata.description}
+
+**Extensions:** ${metadata.extensions}
+**Size:** ${(metadata.size / 1024 / 1024).toFixed(2)} MB
+**Tags:** ${metadata.tags.join(', ') || 'none'}
+
+---
+*Automated PR from ext-pack CLI*`
+  });
+
+  return pr.html_url;
+}
+
+/**
+ * Update registry.json via pull request (for forks)
+ * @param {Octokit} octokit - Octokit instance
+ * @param {string} username - GitHub username
+ * @param {Object} metadata - Pack metadata
+ * @param {boolean} needsFork - Whether this is from a fork
+ * @returns {Promise<string>} PR URL
+ */
+async function updateRegistryViaPR(octokit, username, metadata, needsFork) {
   // Get current registry.json from user's fork
   const { data: file } = await octokit.repos.getContent({
     owner: username,

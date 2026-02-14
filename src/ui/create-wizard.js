@@ -272,20 +272,77 @@ async function isOllamaRunning() {
 }
 
 /**
+ * Get list of available Ollama models
+ */
+async function getAvailableModels() {
+  try {
+    const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return data.models?.map(m => m.name) || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Select the best model for description generation
+ * Prefers smaller, faster models suitable for simple text generation
+ */
+function selectBestModel(availableModels) {
+  // Preferred models in order (smaller/faster first)
+  const preferred = [
+    'qwen2.5:1.5b',
+    'qwen2.5:3b',
+    'llama3.2:1b',
+    'llama3.2:3b',
+    'llama3.2',
+    'qwen2.5:7b',
+    'llama3.1:8b',
+    'llama3:8b',
+    'qwen2.5',
+    'llama3.1',
+    'llama3'
+  ];
+
+  // Try to find a preferred model
+  for (const model of preferred) {
+    const match = availableModels.find(m => m.startsWith(model));
+    if (match) return match;
+  }
+
+  // Fallback to first available model
+  return availableModels[0] || null;
+}
+
+/**
  * Generate a pack description using Ollama
  */
 async function generateDescription(extensions) {
   const extList = extensions.map(e => `${e.name}: ${e.description || 'no description'}`).join(', ');
   const prompt = `Write a single short sentence (under 15 words) describing this browser extension pack containing: ${extList}. Reply with only the sentence, no quotes.`;
 
-  const spinner = ora('Generating description...').start();
+  const spinner = ora('Checking available models...').start();
 
   try {
+    // Get available models
+    const models = await getAvailableModels();
+    const model = selectBestModel(models);
+
+    if (!model) {
+      spinner.fail('No Ollama models found');
+      console.log(colors.muted('  Run "ollama pull llama3.2" to install a model\n'));
+      return null;
+    }
+
+    spinner.text = `Generating description with ${model}...`;
+
     const res = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3.2',
+        model,
         prompt,
         stream: false
       }),
@@ -293,7 +350,9 @@ async function generateDescription(extensions) {
     });
 
     if (!res.ok) {
+      const error = await res.text().catch(() => 'Unknown error');
       spinner.fail('Failed to generate description');
+      console.log(colors.muted(`  ${error}\n`));
       return null;
     }
 
@@ -301,8 +360,9 @@ async function generateDescription(extensions) {
     const text = data.response?.trim();
     spinner.succeed('Description generated');
     return text || null;
-  } catch {
+  } catch (err) {
     spinner.fail('Failed to generate description');
+    console.log(colors.muted(`  ${err.message}\n`));
     return null;
   }
 }

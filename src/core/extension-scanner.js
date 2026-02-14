@@ -70,6 +70,7 @@ function resolveI18nMessage(text, extensionPath, manifest) {
 export function scanDirectory(rootPath, options = {}) {
   const {
     maxDepth = 3,
+    onProgress = null,
     excludeDirs = [
       'node_modules',
       '.git',
@@ -95,9 +96,21 @@ export function scanDirectory(rootPath, options = {}) {
 
   const extensions = [];
   const errors = [];
+  let directoriesScanned = 0;
 
   function scan(currentPath, depth = 0) {
     if (depth > maxDepth) return;
+
+    directoriesScanned++;
+
+    // Call progress callback
+    if (onProgress) {
+      onProgress({
+        directoriesScanned,
+        currentPath,
+        extensionsFound: extensions.length
+      });
+    }
 
     try {
       const entries = readdirSync(currentPath, { withFileTypes: true });
@@ -109,6 +122,16 @@ export function scanDirectory(rootPath, options = {}) {
         const result = validateExtension(currentPath);
         if (result.valid) {
           extensions.push(result.extension);
+
+          // Update progress after finding extension
+          if (onProgress) {
+            onProgress({
+              directoriesScanned,
+              currentPath,
+              extensionsFound: extensions.length,
+              foundExtension: result.extension
+            });
+          }
         } else {
           errors.push({
             path: currentPath,

@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
-import { colors, successBox, clearScreen, browseDirectory } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, browseDirectory, pause } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
@@ -79,13 +79,26 @@ export async function runCreateWizard() {
   const spinner = ora('Scanning for extensions...').start();
 
   const scanPath = resolve(scanDir);
-  const { extensions, errors } = scanDirectory(scanPath);
+  let lastUpdate = Date.now();
 
-  spinner.stop();
+  const { extensions, errors } = scanDirectory(scanPath, {
+    onProgress: (progress) => {
+      // Throttle updates to avoid too many spinner updates
+      const now = Date.now();
+      if (now - lastUpdate > 200) {
+        spinner.text = `Scanning... (${progress.directoriesScanned} dirs, ${progress.extensionsFound} found)`;
+        lastUpdate = now;
+      }
+    }
+  });
+
+  spinner.succeed(`Scan complete (${extensions.length} extensions found)`);
 
   if (extensions.length === 0) {
-    console.log(colors.error('\nNo valid extensions found in this directory.'));
-    console.log(colors.muted('Extensions must have a manifest.json file at their root.\n'));
+    console.log(errorBox(
+      'No valid extensions found in this directory.\n\n' +
+      colors.muted('Extensions must have a manifest.json file at their root.')
+    ));
 
     if (errors.length > 0) {
       console.log(colors.warning('Errors encountered:'));
@@ -95,6 +108,7 @@ export async function runCreateWizard() {
       console.log();
     }
 
+    await pause();
     return null;
   }
 
@@ -131,6 +145,39 @@ export async function runCreateWizard() {
   ]);
 
   const selectedExtensions = selectedIndexes.map(i => extensions[i]);
+
+  // Warn if too many extensions selected
+  if (selectedExtensions.length > 50) {
+    console.log(colors.warning(`\n⚠️  You selected ${selectedExtensions.length} extensions.`));
+    console.log(colors.muted('Large packs may be slow to process and generate very long URLs.\n'));
+  }
+
+  // Check for duplicate extensions
+  const extensionNames = selectedExtensions.map(e => e.name);
+  const duplicates = extensionNames.filter((name, index) => extensionNames.indexOf(name) !== index);
+  if (duplicates.length > 0) {
+    console.log(colors.warning(`\n⚠️  Warning: Duplicate extensions detected:`));
+    const uniqueDuplicates = [...new Set(duplicates)];
+    uniqueDuplicates.forEach(name => {
+      console.log(colors.muted(`   - ${name}`));
+    });
+    console.log();
+
+    const { continueDuplicates } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continueDuplicates',
+        message: 'Continue with duplicates?',
+        default: false
+      }
+    ]);
+
+    if (!continueDuplicates) {
+      console.log(errorBox('Pack creation cancelled.'));
+      await pause();
+      return null;
+    }
+  }
 
   // Step 5: Optionally generate description with Ollama
   let generatedDescription = null;
@@ -196,17 +243,60 @@ export async function runCreateWizard() {
 
   try {
     await writePackFile(resolve(outputFile), pack);
-    saveSpinner.succeed('Pack saved');
+    saveSpinner.succeed('Pack created successfully');
 
     console.log(successBox(
-      `${colors.highlight(outputFile)}\n\n` +
-      `${selectedExtensions.length} extension(s) | ${pack.created}`
+      `Pack: ${colors.highlight(pack.name)}\n\n` +
+      `File: ${outputFile}\n` +
+      `Extensions: ${selectedExtensions.length}\n` +
+      `Created: ${pack.created}`
     ));
+
+    // Suggest next actions
+    const { nextAction } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'nextAction',
+        message: 'What would you like to do next?',
+        choices: [
+          {
+            name: 'Install this pack',
+            value: 'install',
+            short: 'Install'
+          },
+          {
+            name: 'Share this pack',
+            value: 'share',
+            short: 'Share'
+          },
+          new inquirer.Separator(),
+          {
+            name: colors.muted('Return to main menu'),
+            value: 'menu',
+            short: 'Menu'
+          }
+        ]
+      }
+    ]);
+
+    if (nextAction === 'install') {
+      const { runInstallWizard } = await import('./install-wizard.js');
+      await runInstallWizard(outputFile);
+    } else if (nextAction === 'share') {
+      const { runShareWizard } = await import('./share-wizard.js');
+      await runShareWizard(outputFile);
+    }
 
     return outputFile;
   } catch (err) {
-    saveSpinner.fail('Failed to save pack');
-    console.error(colors.error(`\nError: ${err.message}\n`));
+    saveSpinner.fail('Failed to create pack');
+
+    console.log(errorBox(
+      `Failed to save pack file.\n\n` +
+      colors.muted(`Error: ${err.message}`)
+    ));
+
+    await pause();
     return null;
   }
 }

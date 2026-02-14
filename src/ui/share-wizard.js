@@ -6,7 +6,7 @@ import inquirer from 'inquirer';
 import qrcode from 'qrcode-terminal';
 import { resolve, basename } from 'path';
 import { existsSync } from 'fs';
-import { colors, successBox, clearScreen, copyToClipboardMac, selectPackFile } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, copyToClipboardMac, selectPackFile, pause } from './helpers.js';
 import { readPackFile, generateUrl } from '../core/pack-codec.js';
 
 /**
@@ -33,7 +33,8 @@ export async function runShareWizard(packFile = null) {
   const packPath = resolve(selectedPackFile);
 
   if (!existsSync(packPath)) {
-    console.log(colors.error(`\nPack file not found: ${packPath}\n`));
+    console.log(errorBox(`Pack file not found: ${packPath}`));
+    await pause();
     return;
   }
 
@@ -42,7 +43,8 @@ export async function runShareWizard(packFile = null) {
   try {
     pack = await readPackFile(packPath);
   } catch (err) {
-    console.log(colors.error(`\nFailed to read pack: ${err.message}\n`));
+    console.log(errorBox(`Failed to read pack.\n\n${colors.muted(err.message)}`));
+    await pause();
     return;
   }
 
@@ -104,6 +106,10 @@ export async function runShareWizard(packFile = null) {
       break;
 
     case 'back':
+      console.log(colors.muted('\nCancelled.\n'));
+      await pause();
+      break;
+
     default:
       break;
   }
@@ -117,13 +123,41 @@ async function shareAsUrl(pack, packPath) {
 
   const url = generateUrl(pack);
 
+  // Warn if URL is very long
+  if (url.length > 8000) {
+    console.log(warningBox(
+      `⚠️  This pack generates a very long URL (${Math.round(url.length / 1000)}KB).\n\n` +
+      colors.muted('Long URLs may not work in all contexts (email, chat, etc.).\n') +
+      colors.muted('Consider sharing the file directly instead.')
+    ));
+
+    const { continueShare } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'continueShare',
+        message: 'Continue with URL sharing?',
+        default: true
+      }
+    ]);
+
+    if (!continueShare) {
+      return;
+    }
+
+    console.log();
+  }
+
   console.log(successBox(
+    `Shareable URL generated!\n\n` +
     `${colors.highlight(url)}\n\n` +
     colors.muted('Install: ext-pack <url>\n') +
     colors.muted('Or visit the URL in a browser')
   ));
 
   await copyToClipboardMac(url, 'Copy URL to clipboard?');
+
+  // Suggest installing this pack
+  await suggestNextAction(packPath);
 }
 
 /**
@@ -141,6 +175,8 @@ async function shareAsQrCode(pack, packPath) {
   });
 
   console.log(colors.muted('\n' + url + '\n'));
+
+  await suggestNextAction(packPath);
 }
 
 /**
@@ -150,10 +186,51 @@ async function shareAsPath(packPath) {
   console.log();
 
   console.log(successBox(
+    `Pack file path:\n\n` +
     `${colors.highlight(packPath)}\n\n` +
     colors.muted('Install: ext-pack ' + basename(packPath))
   ));
 
   await copyToClipboardMac(packPath, 'Copy path to clipboard?');
+
+  await suggestNextAction(packPath);
+}
+
+/**
+ * Suggest next actions after sharing
+ */
+async function suggestNextAction(packPath) {
+  const { nextAction } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'nextAction',
+      message: 'What would you like to do next?',
+      choices: [
+        {
+          name: 'Install this pack',
+          value: 'install',
+          short: 'Install'
+        },
+        {
+          name: 'Share in a different way',
+          value: 'share_again',
+          short: 'Share again'
+        },
+        new inquirer.Separator(),
+        {
+          name: colors.muted('Return to main menu'),
+          value: 'menu',
+          short: 'Menu'
+        }
+      ]
+    }
+  ]);
+
+  if (nextAction === 'install') {
+    const { runInstallWizard } = await import('./install-wizard.js');
+    await runInstallWizard(packPath);
+  } else if (nextAction === 'share_again') {
+    await runShareWizard(packPath);
+  }
 }
 

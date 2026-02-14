@@ -3,7 +3,7 @@
  */
 
 import inquirer from 'inquirer';
-import { colors, formatPackSummary, timeAgo, clearScreen } from './helpers.js';
+import { colors, formatPackSummary, timeAgo, clearScreen, errorBox, successBox, pause } from './helpers.js';
 import { getInstalledPacks, removeInstalledPack } from '../utils/config-manager.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { existsSync } from 'fs';
@@ -20,7 +20,8 @@ export async function runPackManager() {
   const registry = getInstalledPacks();
 
   if (registry.packs.length === 0) {
-    console.log(colors.muted('  No packs installed yet.\n'));
+    console.log(errorBox('No packs installed yet.'));
+    await pause();
     return;
   }
 
@@ -78,6 +79,7 @@ export async function runPackManager() {
 
     case 'back':
     default:
+      // No need for pause on back, just return to menu
       break;
   }
 }
@@ -126,6 +128,8 @@ async function viewPackDetails(packs) {
   });
 
   console.log();
+
+  await pause();
 }
 
 /**
@@ -153,13 +157,17 @@ async function reinstallPack(packs, preselected = null) {
   const pack = packs[selectedIndex];
 
   if (!pack.file || !existsSync(pack.file)) {
-    console.log(colors.error('\nPack file not found. Cannot reinstall.'));
-    console.log(colors.muted(`Expected: ${pack.file}\n`));
+    console.log(errorBox(
+      `Pack file not found. Cannot reinstall.\n\n` +
+      colors.muted(`Expected: ${pack.file}`)
+    ));
+    await pause();
     return;
   }
 
-  const { installCommand } = await import('../commands/install.js');
-  await installCommand(pack.file);
+  // Run install wizard for the pack
+  const { runInstallWizard } = await import('./install-wizard.js');
+  await runInstallWizard(pack.file);
 }
 
 /**
@@ -197,9 +205,16 @@ async function removePack(packs, preselected = null) {
 
   if (confirm) {
     removeInstalledPack(pack.name);
-    console.log(colors.success(`\nRemoved "${pack.name}" from registry.`));
-    console.log(colors.muted('Extensions remain loaded in browser until restart.\n'));
+
+    console.log(successBox(
+      `Pack removed from registry.\n\n` +
+      `Pack: ${pack.name}\n\n` +
+      colors.muted('Extensions remain loaded in browser until restart.')
+    ));
+
+    await pause();
   } else {
-    console.log(colors.muted('\nCancelled.\n'));
+    console.log(errorBox('Cancelled.'));
+    await pause();
   }
 }

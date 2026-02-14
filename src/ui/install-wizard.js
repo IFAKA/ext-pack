@@ -7,7 +7,7 @@ import ora from 'ora';
 import cliProgress from 'cli-progress';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
-import { colors, successBox, errorBox, formatPackSummary, clearScreen, selectPackFile } from './helpers.js';
+import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, selectPackFile, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -38,6 +38,7 @@ export async function runInstallWizard(packFile = null) {
 
   if (!existsSync(packPath)) {
     console.log(errorBox(`Pack file not found: ${packPath}`));
+    await pause();
     return false;
   }
 
@@ -51,6 +52,7 @@ export async function runInstallWizard(packFile = null) {
   } catch (err) {
     spinner.fail('Failed to read pack file');
     console.log(errorBox(err.message));
+    await pause();
     return false;
   }
 
@@ -80,7 +82,8 @@ export async function runInstallWizard(packFile = null) {
   ]);
 
   if (!confirmInstall) {
-    console.log(colors.muted('\nInstallation cancelled.\n'));
+    console.log(errorBox('Installation cancelled.'));
+    await pause();
     return false;
   }
 
@@ -89,12 +92,41 @@ export async function runInstallWizard(packFile = null) {
 
   if (!browser) {
     console.log(errorBox('No supported browser found. Install Brave, Chrome, or Chromium.'));
+    await pause();
     return false;
   }
 
   console.log(colors.muted(`\nUsing ${browser.displayName}\n`));
 
-  // Step 6: Install pack
+  // Step 6: Check if browser is already running and warn
+  const { isBrowserRunning } = await import('../core/browser-launcher.js');
+  const isRunning = await isBrowserRunning(browser.processName);
+
+  if (isRunning) {
+    console.log(warningBox(
+      `${browser.displayName} is currently running.\n\n` +
+      colors.muted('The browser will be closed and relaunched with extensions.')
+    ));
+
+    const { confirmProceed } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirmProceed',
+        message: 'Close browser and continue?',
+        default: true
+      }
+    ]);
+
+    if (!confirmProceed) {
+      console.log(errorBox('Installation cancelled.'));
+      await pause();
+      return false;
+    }
+
+    console.log();
+  }
+
+  // Step 8: Install pack
   const progressBar = new cliProgress.SingleBar({
     format: 'Installing |{bar}| {percentage}% | {extension}',
     barCompleteChar: '\u2588',
@@ -132,28 +164,85 @@ export async function runInstallWizard(packFile = null) {
 
   // Step 7: Show result
   if (result.success) {
-    console.log(successBox(
-      `${result.extensionCount} extension(s) installed\n` +
-      `${browser.displayName} relaunched with extensions loaded.`
-    ));
+    const hasErrors = result.results.errors && result.results.errors.length > 0;
+    const successCount = result.extensionCount;
+    const totalCount = pack.extensions.length;
+    const failureCount = totalCount - successCount;
 
-    // Show errors if any
-    if (result.results.errors && result.results.errors.length > 0) {
-      console.log(colors.error('\nSome extensions failed to install:\n'));
-      result.results.errors.forEach(err => {
-        console.log(colors.muted(`  ${err.extension.name}: ${err.error}`));
+    // Show different message for partial vs complete success
+    if (hasErrors && failureCount > 0) {
+      // Partial success
+      console.log(warningBox(
+        `Partial installation.\n\n` +
+        `Installed: ${successCount} of ${totalCount} extensions\n` +
+        `Failed: ${failureCount}\n` +
+        `Browser: ${browser.displayName}\n\n` +
+        colors.muted('Successfully installed extensions are loaded in browser.')
+      ));
+
+      // Show detailed error list
+      console.log(colors.error('Failed extensions:\n'));
+      result.results.errors.forEach((err, i) => {
+        console.log(colors.muted(`  ${i + 1}. ${err.extension.name}`));
+        console.log(colors.muted(`     ${err.error}`));
       });
       console.log();
+
+      // Suggest next actions
+      console.log(colors.muted('Tip: Check that failed extensions are compatible with your browser.\n'));
+    } else {
+      // Complete success
+      console.log(successBox(
+        `Installation successful!\n\n` +
+        `Extensions: ${successCount}\n` +
+        `Browser: ${browser.displayName}\n\n` +
+        colors.muted('All extensions loaded and browser relaunched.')
+      ));
+    }
+
+    // Suggest next actions
+    const { nextAction } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'nextAction',
+        message: 'What would you like to do next?',
+        choices: [
+          {
+            name: 'View installed packs',
+            value: 'list',
+            short: 'List'
+          },
+          {
+            name: 'Install another pack',
+            value: 'install',
+            short: 'Install'
+          },
+          new inquirer.Separator(),
+          {
+            name: colors.muted('Return to main menu'),
+            value: 'menu',
+            short: 'Menu'
+          }
+        ]
+      }
+    ]);
+
+    if (nextAction === 'list') {
+      const { runPackManager } = await import('./pack-manager.js');
+      await runPackManager();
+    } else if (nextAction === 'install') {
+      await runInstallWizard();
     }
 
     return true;
   } else {
-    console.log(errorBox(result.message));
+    console.log(errorBox(
+      `Installation failed.\n\n` +
+      `${result.message}` +
+      (result.reason === 'browser_running' ? '\n\n' + colors.muted('Close the browser and try again.') : '')
+    ));
 
-    if (result.reason === 'browser_running') {
-      console.log(colors.muted('\nClose the browser and try again.\n'));
-    }
-
+    await pause();
     return false;
   }
 }

@@ -264,7 +264,7 @@ function detectExtensionDirs() {
  */
 async function isOllamaRunning() {
   try {
-    const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(1000) });
+    const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1000) });
     return res.ok;
   } catch {
     return false;
@@ -276,7 +276,7 @@ async function isOllamaRunning() {
  */
 async function getAvailableModels() {
   try {
-    const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) });
+    const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2000) });
     if (!res.ok) return [];
 
     const data = await res.json();
@@ -338,7 +338,7 @@ async function generateDescription(extensions) {
 
     spinner.text = `Generating description with ${model}...`;
 
-    const res = await fetch('http://localhost:11434/api/generate', {
+    const res = await fetch('http://127.0.0.1:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

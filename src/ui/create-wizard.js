@@ -110,7 +110,7 @@ export async function runCreateWizard() {
   });
   console.log();
 
-  // Step 4: Select extensions to include — ALL CHECKED BY DEFAULT
+  // Step 4: Select extensions to include
   const { selectedIndexes } = await inquirer.prompt([
     {
       type: 'checkbox',
@@ -119,7 +119,7 @@ export async function runCreateWizard() {
       choices: extensions.map((ext, i) => ({
         name: `${ext.name} (v${ext.version})`,
         value: i,
-        checked: true
+        checked: false
       })),
       validate: (answer) => {
         if (answer.length === 0) {

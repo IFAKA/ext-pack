@@ -3,6 +3,8 @@
  * Adapted for Node.js from extension-pack-hub
  */
 
+import fs from 'fs-extra';
+
 /**
  * Encode a pack object to a URL-safe string
  */
@@ -131,7 +133,6 @@ export function upgrade(pack) {
  * Read pack from file
  */
 export async function readPackFile(filePath) {
-  const fs = await import('fs-extra');
   const packData = await fs.readJson(filePath);
 
   // Validate pack
@@ -152,8 +153,6 @@ export async function readPackFile(filePath) {
  * Write pack to file
  */
 export async function writePackFile(filePath, pack) {
-  const fs = await import('fs-extra');
-
   // Validate before writing
   const validation = validate(pack);
   if (!validation.valid) {

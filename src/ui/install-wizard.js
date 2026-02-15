@@ -8,7 +8,7 @@ import cliProgress from 'cli-progress';
 import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, findPackFileSmart, pause } from './helpers.js';
+import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -25,14 +25,41 @@ export async function runInstallWizard(packFile = null) {
 
   console.log(colors.bold('\n  Install Extension Pack\n'));
 
-  // Step 1: Get pack file or name (smart auto-detection!)
+  // Step 1: Get pack file or name
   let selectedPackFile = packFile;
   let packPath = null;
   let isFromRegistry = false;
 
   if (!selectedPackFile) {
-    selectedPackFile = await findPackFileSmart();
-    if (!selectedPackFile) {
+    // No pack specified - show registry browser
+    const inquirer = (await import('inquirer')).default;
+
+    const checkSpinner = ora('Fetching registry...').start();
+
+    try {
+      const accessible = await isRegistryAccessible();
+
+      if (!accessible) {
+        checkSpinner.fail('Registry not accessible');
+        console.log(errorBox('Cannot connect to registry.\n\nCheck your internet connection.'));
+        await pause();
+        return false;
+      }
+
+      // TODO: Fetch and show registry packs
+      checkSpinner.warn('Registry browser not implemented yet');
+      console.log(errorBox(
+        'Please specify a pack to install:\n\n' +
+        '  ext-pack install <pack-name>     # From registry\n' +
+        '  ext-pack install <file.extpack>  # From file'
+      ));
+      await pause();
+      return false;
+
+    } catch (error) {
+      checkSpinner.fail('Failed to connect');
+      console.log(errorBox(`Error: ${error.message}`));
+      await pause();
       return false;
     }
   }

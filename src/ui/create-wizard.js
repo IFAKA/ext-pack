@@ -59,28 +59,46 @@ export async function runCreateWizard(options = {}) {
         return null;
       }
 
-      if (candidates.length === 1) {
-        // Only one candidate - use it automatically
-        scanDir = candidates[0].path;
-        packName = options.name || candidates[0].label.toLowerCase() + '-extensions';
-        console.log(colors.success(`Using ${candidates[0].label} extensions (${candidates[0].count} found)\n`));
-      } else {
-        // Multiple candidates - need to ask
-        const choices = candidates.map(c => ({
-          name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)}`,
-          value: c.path,
-          short: c.label
-        }));
+      // Always ask user to choose (don't auto-select)
+      const choices = candidates.map(c => ({
+        name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)}`,
+        value: c.path,
+        short: c.label
+      }));
 
-        const { selectedDir } = await inquirer.prompt([
+      // Add custom directory option
+      choices.push(new inquirer.Separator());
+      choices.push({
+        name: colors.muted('Custom directory...'),
+        value: '__custom__',
+        short: 'Custom'
+      });
+
+      const { selectedDir } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'selectedDir',
+          message: 'Where to scan for extensions:',
+          choices
+        }
+      ]);
+
+      if (selectedDir === '__custom__') {
+        const { customPath } = await inquirer.prompt([
           {
-            type: 'list',
-            name: 'selectedDir',
-            message: 'Where to scan for extensions:',
-            choices
+            type: 'input',
+            name: 'customPath',
+            message: 'Path to extensions directory:',
+            validate: (input) => {
+              if (!input) return 'Path is required';
+              if (!existsSync(input)) return 'Directory not found';
+              return true;
+            }
           }
         ]);
-
+        scanDir = customPath;
+        packName = options.name || basename(customPath);
+      } else {
         scanDir = selectedDir;
         const selected = candidates.find(c => c.path === selectedDir);
         packName = options.name || selected.label.toLowerCase() + '-extensions';

@@ -3,14 +3,6 @@
 import { Command } from 'commander';
 import { createCommand } from '../src/commands/create.js';
 import { installCommand } from '../src/commands/install.js';
-import { shareCommand } from '../src/commands/share.js';
-import { listCommand } from '../src/commands/list.js';
-import { publishCommand } from '../src/commands/publish.js';
-import { searchCommand } from '../src/commands/search.js';
-import { completionCommand } from '../src/commands/completion.js';
-import { infoCommand } from '../src/commands/info.js';
-import { removeCommand } from '../src/commands/remove.js';
-import { updateCommand } from '../src/commands/update.js';
 
 const program = new Command();
 
@@ -19,17 +11,9 @@ program
   .description('Bundle and install browser extensions with zero friction')
   .version('3.0.3');
 
-// Register all commands
+// Only 2 commands - keep it simple!
 program.addCommand(createCommand);
 program.addCommand(installCommand);
-program.addCommand(shareCommand);
-program.addCommand(listCommand);
-program.addCommand(publishCommand);
-program.addCommand(searchCommand);
-program.addCommand(infoCommand);
-program.addCommand(updateCommand);
-program.addCommand(removeCommand);
-program.addCommand(completionCommand);
 
 // Show help when no command specified
 program.action(() => {
@@ -39,11 +23,10 @@ program.action(() => {
 // Custom help
 program.addHelpText('after', `
 Examples:
-  $ ext-pack create                   # Create a new pack
-  $ ext-pack install my-pack.extpack  # Install from file
-  $ ext-pack share my-pack.extpack    # Generate shareable URL
-  $ ext-pack list                     # List installed packs
-  $ ext-pack completion               # Install shell completions
+  $ ext-pack create    # Create a pack (save locally or publish to registry)
+  $ ext-pack install   # Browse registry and install a pack
+
+That's it! Just 2 commands.
 
 For more information, visit: https://github.com/ext-pack
 `);

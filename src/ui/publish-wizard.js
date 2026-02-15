@@ -7,7 +7,7 @@ import { existsSync } from 'fs';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { colors, successBox, errorBox, clearScreen, findPackFileSmart, pause } from './helpers.js';
-import { readPackFile } from '../core/pack-codec.js';
+import { readPackFile, writePackFile } from '../core/pack-codec.js';
 import { publishPack, hasGitHubAuth } from '../core/github-publisher.js';
 import { runCreateWizard } from './create-wizard.js';
 
@@ -220,6 +220,15 @@ export async function runPublishWizard(packPath = null, options = {}) {
     ]);
 
     pack.tags = selectedTags;
+
+    // Save tags back to pack file
+    try {
+      await writePackFile(packPath, pack);
+    } catch (error) {
+      console.log(errorBox(`Failed to update pack file with tags.\n\n${colors.muted(error.message)}`));
+      await pause();
+      return;
+    }
   }
 
   // Step 6: Confirm publish

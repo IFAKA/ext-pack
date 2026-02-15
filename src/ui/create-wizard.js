@@ -209,12 +209,37 @@ export async function runCreateWizard(options = {}) {
   const bundledSizeMB = (totalBundledSize / 1024 / 1024).toFixed(2);
   bundleSpinner.succeed(`Extensions bundled (${bundledSizeMB} MB compressed)`);
 
-  // 5. Smart defaults for metadata
-  const description = `${bundledExtensions.length} browser extensions`;
+  // 5. Get pack metadata from user
+  console.log();
+  const { finalPackName, packDescription } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'finalPackName',
+      message: 'Pack name:',
+      default: packName,
+      validate: (input) => {
+        if (!input || input.trim().length === 0) {
+          return 'Pack name cannot be empty';
+        }
+        return true;
+      }
+    },
+    {
+      type: 'input',
+      name: 'packDescription',
+      message: 'Description:',
+      default: `${bundledExtensions.length} browser extensions`,
+      validate: (input) => {
+        if (!input || input.trim().length === 0) {
+          return 'Description cannot be empty';
+        }
+        return true;
+      }
+    }
+  ]);
+
   const author = getAuthor();
 
-  console.log(colors.muted(`Pack: ${packName}`));
-  console.log(colors.muted(`Description: ${description}`));
   console.log(colors.muted(`Author: ${author}\n`));
 
   // 6. Smart output location
@@ -223,11 +248,11 @@ export async function runCreateWizard(options = {}) {
     mkdirSync(packsDir, { recursive: true });
   }
 
-  const defaultFileName = `${packName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
+  const defaultFileName = `${finalPackName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
   const outputFile = options.output || join(packsDir, defaultFileName);
 
   // 7. Create and save pack
-  const pack = createPack(packName, description, author, bundledExtensions);
+  const pack = createPack(finalPackName, packDescription, author, bundledExtensions);
   const saveSpinner = ora('Saving pack...').start();
 
   try {

@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { createRequire } from 'module';
 import { createCommand } from '../src/commands/create.js';
 import { installCommand } from '../src/commands/install.js';
 import { listCommand } from '../src/commands/list.js';
+
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
 
 const program = new Command();
 
 program
   .name('ext-pack')
   .description('Bundle and install browser extensions with zero friction')
-  .version('4.0.0');
+  .version(version);
 
 // 3 simple commands
 program.addCommand(createCommand);

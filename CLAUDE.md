@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-ext-pack is a Node.js CLI tool that bundles and installs Chromium-based browser extensions (Brave, Chrome, Chromium, Edge) with zero friction. It creates `.extpack` files (JSON format, v2/v3) containing extension references, then relaunches browsers with `--load-extension` to load them persistently.
+ext-pack is a Node.js CLI tool that bundles and installs Chromium-based browser extensions (Brave, Chrome, Chromium, Edge) with zero friction. It creates `.extpack` files (compressed bundles) containing full extension files, publishes them to a GitHub-based registry, and allows users to install packs from the registry. Think "npm for Chrome extensions".
+
+**Key Features:**
+- **Extension selection** - Checkbox prompt (unchecked by default) to choose which extensions to include
+- **AI-powered metadata** - Ollama auto-generates descriptions and suggests tags (if running)
+- **GitHub registry** - Publish packs to `IFAKA/ext-pack-registry` with auto-merge PRs
+- **Full bundling** - Extensions are gzip-compressed and bundled into .extpack files
+- **One-command install** - `ext-pack install` browses registry and installs extensions to browser
 
 ## ⚠️ CRITICAL: Testing Requirement
 
@@ -16,12 +23,9 @@ ext-pack is a Node.js CLI tool that bundles and installs Chromium-based browser 
 5. Only commit once ALL flows work perfectly
 
 **Main User Flows to Test:**
-- **Publish**: `ext-pack publish` → detects extensions, creates pack, publishes to registry (single command)
-- **Install**: `ext-pack install` → shows registry packs, user selects, installs (single command)
-- **Share**: `ext-pack share` → auto-finds pack, generates URL/QR
-- **Search**: `ext-pack search <query>` → searches registry
-- **List**: `ext-pack list` → shows installed packs
-- **Info**: `ext-pack info <pack>` → shows pack details
+- **Create**: `ext-pack create` → select extensions, AI generates description/tags, optionally publish to registry
+- **Install**: `ext-pack install` → browse registry, select pack, download and install extensions
+- **List**: `ext-pack list` → manage installed packs (view, update, remove)
 
 ## Commands
 
@@ -38,14 +42,20 @@ No test framework or linter is configured.
 **Entry point**: `bin/ext-pack.js` — parses args, handles `.extpack` file argument or launches interactive menu.
 
 **Layer separation**:
-- `src/commands/` — Thin command handlers (create, install, list, share) that delegate to UI wizards
-- `src/ui/` — Interactive prompts using inquirer (wizards, menus, helpers)
+- `src/commands/` — Thin command handlers (create, install, list) that delegate to UI wizards
+- `src/ui/` — Interactive prompts using inquirer (wizards, menus, helpers):
+  - `create-wizard.js` — Extension selection (checkbox), AI description generation, metadata prompts
+  - `publish-wizard.js` — AI tag suggestions (Ollama), GitHub auth, pack publishing
+  - `install-wizard.js` — Registry browser, pack selection, download and installation
+  - `list-wizard.js` — Pack management (view, update, remove)
 - `src/core/` — Business logic with no UI dependencies:
-  - `pack-codec.js` — Pack create/validate/read/write, URL encode/decode (base64), v2→v3 upgrade
+  - `pack-codec.js` — Pack create/validate/read/write, URL encode/decode (base64)
+  - `bundle-codec.js` — Gzip compression/decompression, extension bundling/extraction
   - `extension-scanner.js` — Recursive directory scan for `manifest.json`, extension validation
-  - `pack-installer.js` — Orchestrates install: processes local/github/store extensions, relaunches browser
+  - `pack-installer.js` — Orchestrates install: extracts bundles, relaunches browser
   - `browser-launcher.js` — Kill/spawn browser processes with `--load-extension` flag
-  - `github-api.js` — Download GitHub releases, extract zips, find extension dirs in extracted files
+  - `github-publisher.js` — GitHub releases, registry.json PRs, auto-fork/branch logic
+  - `registry-client.js` — Fetch registry, search packs, download from GitHub releases
 - `src/utils/` — Cross-cutting utilities:
   - `browser-detector.js` — Platform-specific browser path/process detection (darwin/linux/win32)
   - `config-manager.js` — Manages `~/.ext-pack/` config, installation registry, cache dir
@@ -54,5 +64,8 @@ No test framework or linter is configured.
 - ESM modules throughout (`"type": "module"` in package.json)
 - All modules use both named exports and a default object export
 - Commands flow: command → UI wizard → core logic
-- Three extension types: `local` (filesystem), `github` (downloaded releases), `store` (manual install only)
-- User config lives at `~/.ext-pack/` (config.json, installed.json, downloads/)
+- Extension types: `bundled` (compressed in pack), `github` (downloaded releases), `store` (manual install only)
+- User config lives at `~/.ext-pack/` (config.json, packs/, downloads/)
+- Registry: GitHub-based at `IFAKA/ext-pack-registry` with auto-merge validation
+- AI features: Ollama integration for description generation and tag suggestions (optional)
+- Versioning: Dynamic version reading from package.json (bin/ext-pack.js)

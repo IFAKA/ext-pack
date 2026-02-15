@@ -59,7 +59,11 @@ export async function killBrowser(processName, force = false) {
     return true;
   } catch (err) {
     // Process may not be running, which is fine
-    if (err.message.includes('No such process') || err.message.includes('not found')) {
+    const errorText = (err.message + ' ' + (err.stderr || '')).toLowerCase();
+
+    if (errorText.includes('no such process') ||
+        errorText.includes('not found') ||
+        errorText.includes('no matching processes')) {
       return true;
     }
 

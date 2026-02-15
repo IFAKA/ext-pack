@@ -163,7 +163,7 @@ export async function runCreateWizard(options = {}) {
         choices: extensions.map((ext, i) => ({
           name: `${ext.name} ${colors.muted(`v${ext.version}`)}`,
           value: i,
-          checked: true // All checked by default
+          checked: false // All unchecked by default - user must explicitly select
         })),
         validate: (answer) => {
           if (answer.length < 1) {

@@ -12,6 +12,66 @@ import { publishPack, hasGitHubAuth } from '../core/github-publisher.js';
 import { runCreateWizard } from './create-wizard.js';
 
 /**
+ * Check if Ollama is running
+ */
+async function isOllamaRunning() {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      method: 'GET',
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Use Ollama to suggest relevant tags for the pack
+ */
+async function suggestTagsWithOllama(pack, availableTags) {
+  try {
+    const extensionNames = pack.extensions.map(ext => ext.name || 'Unknown').join(', ');
+
+    const prompt = `You are a tag suggestion assistant. Given a browser extension pack, suggest 2-3 relevant tags from this list: ${availableTags.join(', ')}.
+
+Pack name: ${pack.name}
+Description: ${pack.description || 'No description'}
+Extensions: ${extensionNames}
+
+Respond with ONLY the tag names, comma-separated, nothing else. Example: productivity,dev-tools`;
+
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen2.5-coder:0.5b',
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.3,
+          num_predict: 50
+        }
+      }),
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const suggestedText = data.response.trim().toLowerCase();
+
+    // Parse suggested tags
+    const suggested = suggestedText.split(',').map(t => t.trim());
+
+    // Only return tags that exist in availableTags
+    return suggested.filter(tag => availableTags.includes(tag));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Run the publish wizard (creates pack if needed, then publishes)
  * @param {string} packPath - Path to pack file (optional)
  * @param {Object} options - Publish options
@@ -97,7 +157,7 @@ export async function runPublishWizard(packPath = null, options = {}) {
   if (!pack.tags || pack.tags.length === 0) {
     console.log(colors.warning('\n⚠️  No tags specified. Tags help users discover your pack.\n'));
 
-    const suggestedTags = [
+    const availableTags = [
       'productivity',
       'privacy',
       'dev-tools',
@@ -108,12 +168,31 @@ export async function runPublishWizard(packPath = null, options = {}) {
       'design'
     ];
 
+    // Try to auto-suggest tags using Ollama
+    let preselectedTags = [];
+    const ollamaRunning = await isOllamaRunning();
+
+    if (ollamaRunning) {
+      const spinner = ora('Suggesting tags with Ollama...').start();
+      preselectedTags = await suggestTagsWithOllama(pack, availableTags);
+
+      if (preselectedTags.length > 0) {
+        spinner.succeed(`Suggested tags: ${preselectedTags.join(', ')}`);
+      } else {
+        spinner.info('Could not suggest tags');
+      }
+    }
+
     const { selectedTags } = await inquirer.prompt([
       {
         type: 'checkbox',
         name: 'selectedTags',
         message: 'Select tags (optional):',
-        choices: suggestedTags
+        choices: availableTags.map(tag => ({
+          name: tag,
+          value: tag,
+          checked: preselectedTags.includes(tag) // Pre-select Ollama suggestions
+        }))
       }
     ]);
 

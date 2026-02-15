@@ -200,8 +200,8 @@ export async function downloadPack(packId, targetPath, onProgress = null) {
   }
 
   // Write to file
-  const { writeFile } = await import('fs-extra');
-  await writeFile(targetPath, blob);
+  const fs = await import('fs/promises');
+  await fs.writeFile(targetPath, Buffer.from(blob));
 }
 
 /**

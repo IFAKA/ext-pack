@@ -3,7 +3,7 @@
  * Philosophy: Smart defaults, minimal prompts, zero configuration
  */
 
-import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
 import inquirer from 'inquirer';

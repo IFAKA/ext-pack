@@ -27,10 +27,33 @@ async function isOllamaRunning() {
 }
 
 /**
+ * Get first available Ollama model
+ */
+async function getFirstOllamaModel() {
+  try {
+    const response = await fetch('http://localhost:11434/api/tags', {
+      signal: AbortSignal.timeout(2000)
+    });
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (data.models && data.models.length > 0) {
+      return data.models[0].name;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Use Ollama to suggest relevant tags for the pack
  */
 async function suggestTagsWithOllama(pack, availableTags) {
   try {
+    const model = await getFirstOllamaModel();
+    if (!model) return [];
+
     const extensionNames = pack.extensions.map(ext => ext.name || 'Unknown').join(', ');
 
     const prompt = `You are a tag suggestion assistant. Given a browser extension pack, suggest 2-3 relevant tags from this list: ${availableTags.join(', ')}.
@@ -45,7 +68,7 @@ Respond with ONLY the tag names, comma-separated, nothing else. Example: product
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'qwen2.5-coder:0.5b',
+        model: model,
         prompt: prompt,
         stream: false,
         options: {
@@ -53,7 +76,7 @@ Respond with ONLY the tag names, comma-separated, nothing else. Example: product
           num_predict: 50
         }
       }),
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(10000)
     });
 
     if (!response.ok) return [];

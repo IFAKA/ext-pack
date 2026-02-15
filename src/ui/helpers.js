@@ -361,7 +361,12 @@ const IGNORED_DIRS = new Set([
 function findAllDirectories(dir, maxDepth = 5, currentDepth = 0) {
   if (currentDepth >= maxDepth) return [];
 
-  const dirs = [dir]; // Include current directory
+  const dirs = [];
+
+  // Only include current directory at root level
+  if (currentDepth === 0) {
+    dirs.push(dir);
+  }
 
   try {
     const entries = readdirSync(dir, { withFileTypes: true });

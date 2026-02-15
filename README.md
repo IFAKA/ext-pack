@@ -349,33 +349,100 @@ npm install
 npm link
 ```
 
+### 🚨 Systematic Testing Workflow
+
+**ext-pack enforces a systematic approach where all changes MUST be tested before committing.**
+
+**Git hooks enforce testing:**
+- ✅ `pre-commit` - Blocks commits without testing verification
+- ✅ `pre-push` - Final confirmation before pushing to remote
+
+**Development workflow:**
+
+1. **Make code changes**
+   ```bash
+   # Edit files using your editor or AI agent
+   ```
+
+2. **Install changes globally**
+   ```bash
+   npm link
+   ```
+
+3. **Run systematic testing checklist**
+   ```bash
+   npm test  # Shows testing guide
+   ```
+
+   Follow the full testing protocol in `.claude/skills/testing-checklist/SKILL.md`:
+   - ✅ Test 1: Create flow (end-to-end)
+   - ✅ Test 2: Install flow (end-to-end)
+   - ✅ Test 3: List flow (end-to-end)
+   - ✅ Test 4: Publish flow (end-to-end)
+   - ✅ Test 5: Error handling & edge cases
+
+4. **Mark testing complete** (required for commit)
+   ```bash
+   touch .testing-verified
+   ```
+
+5. **Commit and push**
+   ```bash
+   git add .
+   git commit -m "Your commit message"  # Pre-commit hook verifies testing
+   git push                              # Pre-push hook confirms testing
+   ```
+
+6. **Publish to npm** (CRITICAL - don't skip!)
+   ```bash
+   npm publish --otp=YOUR_CODE
+   ```
+
+**Why this approach?**
+- ❌ No untested code reaches users
+- ❌ No gaps or missed edge cases
+- ❌ No exceptions or shortcuts
+- ✅ Systematic = Quality
+
 ### Commands
 
 ```bash
 npm run dev              # Run CLI locally
-npm link                 # Install globally
+npm link                 # Install globally (required for testing)
+npm test                 # Show systematic testing guide
 npm unlink -g ext-pack   # Remove global link
 ```
 
 ### Project Structure
 
-- `bin/` - CLI entry point
+- `bin/` - CLI entry point and utilities
+  - `ext-pack.js` - Main CLI entry point
+  - `test-checklist.js` - Testing checklist command
 - `src/commands/` - Command modules
 - `src/core/` - Core business logic
 - `src/ui/` - Interactive wizards
 - `src/utils/` - Shared utilities
+- `.claude/skills/` - Development skills (testing, workflows)
+- `.git/hooks/` - Pre-commit and pre-push hooks
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please follow the systematic testing workflow:
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. **Follow systematic testing workflow** (see Development section above)
+   - Run `npm link` to install changes
+   - Run `npm test` to see testing checklist
+   - Test ALL user flows (create, install, list, publish, errors)
+   - Run `touch .testing-verified` when complete
+5. Commit and push (git hooks enforce testing)
+6. Submit a pull request
+
+**⚠️ IMPORTANT:** Pre-commit hooks will block commits without testing verification.
 
 **Publishing packs to the registry:**
 1. Create your pack locally (`ext-pack create`)

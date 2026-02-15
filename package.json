@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "node bin/ext-pack.js",
     "link": "npm link",
-    "unlink": "npm unlink -g ext-pack"
+    "unlink": "npm unlink -g ext-pack",
+    "test": "node bin/test-checklist.js"
   },
   "keywords": [
     "chrome",

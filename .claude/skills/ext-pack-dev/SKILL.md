@@ -97,14 +97,25 @@ npm publish --otp=YOUR_CODE
 
 ### Workflow 1: Making Code Changes
 
-**ALWAYS follow this sequence for ANY code change:**
+**🚨 CRITICAL: SYSTEMATIC TESTING IS MANDATORY**
+
+**ALWAYS follow this sequence for ANY code change (NO EXCEPTIONS):**
 
 1. **Make the change** using dedicated tools (Read, Edit, Write, Glob, Grep)
-2. **Test automatically** - NEVER ask, just run `npm run dev` or `npm link` to verify
-3. **Commit with clear message** following the project's commit style
-4. **Push to remote**
-5. **REMIND USER TO PUBLISH TO NPM** ← CRITICAL!
-6. **Reinstall if needed** - Run `npm link` after pushing
+2. **Install changes globally** - Run `npm link` to install updated code
+3. **Run FULL testing checklist** - Execute every test in `.claude/skills/testing-checklist/SKILL.md`
+   - Test 1: Create flow (end-to-end)
+   - Test 2: Install flow (end-to-end)
+   - Test 3: List flow (end-to-end)
+   - Test 4: Publish flow (end-to-end)
+   - Test 5: Error handling & edge cases
+4. **Verify all tests pass** - If ANY test fails, FIX IT and re-test from Test 1
+5. **Mark testing complete** - Run `touch .testing-verified` (required for commit)
+6. **Commit with clear message** following the project's commit style
+7. **Push to remote**
+8. **REMIND USER TO PUBLISH TO NPM** ← CRITICAL!
+
+**Pre-commit hook will BLOCK commits if `.testing-verified` doesn't exist or is stale (>10 min)**
 
 ```bash
 # Example workflow
@@ -176,24 +187,31 @@ export const deprecated_var = null;  // Unused, just for compatibility
 
 ### Workflow 4: Testing Changes
 
-**CRITICAL RULE: Always test changes automatically after making them.**
+**🚨 CRITICAL RULE: SYSTEMATIC TESTING CHECKLIST IS MANDATORY**
 
-**Testing methods:**
-1. **Local development**: `npm run dev` (runs `node bin/ext-pack.js`)
-2. **Global installation**: `npm link` (installs as `ext-pack` command)
-3. **Syntax check**: `node -c <file>` for quick validation
-4. **Uninstall global**: `npm unlink -g ext-pack` if needed
+**NO CODE IS COMMITTED WITHOUT COMPLETING THE FULL TESTING CHECKLIST**
 
-**What to test:**
-- Does the CLI start without errors?
-- Does the changed functionality work as expected?
-- Are there any runtime errors or warnings?
-- Does the output match expectations?
+**Testing Protocol:**
+1. **Install globally**: `npm link`
+2. **Follow systematic checklist**: See `.claude/skills/testing-checklist/SKILL.md`
+3. **Run ALL tests** (create, install, list, publish, error handling)
+4. **Verify EVERY checkbox** in the testing checklist
+5. **Mark complete**: `touch .testing-verified` (enables commit)
+
+**Quick testing methods** (for rapid iteration before full checklist):
+- **Local development**: `npm run dev` (runs `node bin/ext-pack.js`)
+- **Global installation**: `npm link` (installs as `ext-pack` command)
+- **Syntax check**: `node -c <file>` for quick validation
+
+**Git hooks enforce testing:**
+- `pre-commit` - Requires `.testing-verified` file to exist and be recent (<10 min)
+- `pre-push` - Final confirmation that all flows were tested
 
 **NEVER**:
-- Skip testing after code changes
-- Ask permission to test - just do it
-- Assume code works without verification
+- Skip any test in the checklist
+- Commit without testing verification file
+- Make exceptions to the testing protocol
+- Assume code works without end-to-end verification
 
 ## Coding Standards
 

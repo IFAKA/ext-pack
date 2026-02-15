@@ -146,9 +146,37 @@ export async function runCreateWizard(options = {}) {
   });
   console.log();
 
-  // 3. Include ALL extensions by default (smart!)
-  const selectedExtensions = extensions;
-  console.log(colors.success(`Including all ${extensions.length} extension(s)\n`));
+  // 3. Let user select which extensions to include
+  let selectedExtensions;
+
+  if (extensions.length === 1) {
+    // Only one extension - auto-include it
+    selectedExtensions = extensions;
+    console.log(colors.success(`Including extension\n`));
+  } else {
+    // Multiple extensions - let user choose
+    const { selected } = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'selected',
+        message: 'Select extensions to include:',
+        choices: extensions.map((ext, i) => ({
+          name: `${ext.name} ${colors.muted(`v${ext.version}`)}`,
+          value: i,
+          checked: true // All checked by default
+        })),
+        validate: (answer) => {
+          if (answer.length < 1) {
+            return 'You must select at least one extension.';
+          }
+          return true;
+        }
+      }
+    ]);
+
+    selectedExtensions = selected.map(i => extensions[i]);
+    console.log(colors.success(`Including ${selectedExtensions.length} extension(s)\n`));
+  }
 
   // 4. Bundle extensions
   const bundleSpinner = ora('Bundling extensions...').start();

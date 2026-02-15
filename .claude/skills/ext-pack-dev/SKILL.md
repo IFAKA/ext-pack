@@ -78,6 +78,23 @@ export function scanDirectory(path) { ... }
 
 ## Development Workflows
 
+### 🚨 CRITICAL: Publishing to npm
+
+**AFTER EVERY PUSH, REMIND USER TO PUBLISH:**
+
+```bash
+npm publish --otp=YOUR_CODE
+```
+
+**When to publish:**
+- ✅ After bug fixes (patch: x.x.X)
+- ✅ After new features (minor: x.X.0)
+- ✅ After breaking changes (major: X.0.0)
+
+**NEVER SKIP THIS!** Pushed code won't reach users until published to npm.
+
+---
+
 ### Workflow 1: Making Code Changes
 
 **ALWAYS follow this sequence for ANY code change:**
@@ -86,7 +103,8 @@ export function scanDirectory(path) { ... }
 2. **Test automatically** - NEVER ask, just run `npm run dev` or `npm link` to verify
 3. **Commit with clear message** following the project's commit style
 4. **Push to remote**
-5. **Reinstall if needed** - Run `npm link` after pushing
+5. **REMIND USER TO PUBLISH TO NPM** ← CRITICAL!
+6. **Reinstall if needed** - Run `npm link` after pushing
 
 ```bash
 # Example workflow

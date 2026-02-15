@@ -16,7 +16,7 @@ ext-pack lets you bundle multiple browser extensions into a single portable pack
 - 🌐 **Publish & share** - Publish your packs to the public registry in seconds
 - 💻 **Works offline** - Packs are self-contained with all extensions embedded
 - 🎯 **Zero config** - Just install and go, no setup required
-- 🔧 **Modern CLI** - Dual-mode: interactive wizards OR direct commands
+- 🔧 **Modern CLI** - Clean command-line interface with optional interactive prompts
 - ⚡ **Shell autocomplete** - Tab completion for commands and pack names
 
 ## 📥 Installation
@@ -72,10 +72,6 @@ ext-pack search productivity --tag privacy
 ```
 
 ## 📚 Commands
-
-### `ext-pack` (no args)
-
-Interactive menu - guides you through all features.
 
 ### `ext-pack create [name]`
 
@@ -270,7 +266,7 @@ ext-pack/
 **Design principles:**
 - Modular commands - Each command is self-contained
 - Clean separation - Commands → Wizards → Core logic
-- Dual-mode - Interactive wizards OR direct commands
+- Optional interactivity - Use flags for automation or prompts for guidance
 - Zero legacy - Modern ESM, no backward compatibility
 
 ---

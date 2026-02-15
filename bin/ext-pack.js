@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name('ext-pack')
   .description('Bundle and install browser extensions with zero friction')
-  .version('2.0.0');
+  .version('2.0.1');
 
 // Register all commands
 program.addCommand(createCommand);
@@ -31,23 +31,14 @@ program.addCommand(updateCommand);
 program.addCommand(removeCommand);
 program.addCommand(completionCommand);
 
-// Interactive menu when no command specified
-program.action(async () => {
-  const { checkFirstRun } = await import('../src/utils/config-manager.js');
-  const { showOnboarding } = await import('../src/ui/onboarding.js');
-  const { showMainMenu } = await import('../src/ui/main-menu.js');
-
-  const isFirstRun = await checkFirstRun();
-  if (isFirstRun) {
-    await showOnboarding();
-  }
-  await showMainMenu();
+// Show help when no command specified
+program.action(() => {
+  program.help();
 });
 
 // Custom help
 program.addHelpText('after', `
 Examples:
-  $ ext-pack                          # Interactive menu
   $ ext-pack create                   # Create a new pack
   $ ext-pack install my-pack.extpack  # Install from file
   $ ext-pack share my-pack.extpack    # Generate shareable URL

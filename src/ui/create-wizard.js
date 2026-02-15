@@ -15,65 +15,81 @@ import { bundleExtension, calculateBundleSize } from '../core/bundle-codec.js';
 
 /**
  * Run the create pack wizard
+ * @param {Object} options - Command options
+ * @param {string} options.name - Pack name
+ * @param {string} options.dir - Directory to scan
+ * @param {string} options.output - Output file path
+ * @param {boolean} options.yes - Skip confirmations
  * @returns {Promise<string|null>} Path to created pack file or null if cancelled
  */
-export async function runCreateWizard() {
+export async function runCreateWizard(options = {}) {
   clearScreen();
 
   console.log(colors.bold('\n  Create Extension Pack\n'));
 
   // Step 1: Get pack name
-  const { packName } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'packName',
-      message: 'Pack name:',
-      default: () => {
-        const cwd = process.cwd();
-        return basename(cwd) + '-extensions';
-      },
-      validate: (input) => {
-        if (!input || input.trim().length === 0) {
-          return 'Pack name is required';
-        }
-        return true;
-      }
-    }
-  ]);
-
-  // Step 2: Detect extension directories
-  const detectSpinner = ora('Looking for extensions...').start();
-
-  const candidates = detectExtensionDirs();
-  detectSpinner.stop();
-
-  let scanDir;
-
-  if (candidates.length > 0) {
-    const choices = candidates.map(c => ({
-      name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} ${colors.muted('—')} ${colors.muted(c.path)}`,
-      value: c.path,
-      short: c.label
-    }));
-    choices.push({ name: colors.muted('Browse for a directory...'), value: '__custom__', short: 'Custom' });
-
-    const { selectedDir } = await inquirer.prompt([
+  let packName;
+  if (options.name) {
+    packName = options.name;
+    console.log(colors.muted(`Pack name: ${packName}\n`));
+  } else {
+    const result = await inquirer.prompt([
       {
-        type: 'list',
-        name: 'selectedDir',
-        message: 'Where to scan for extensions:',
-        choices
+        type: 'input',
+        name: 'packName',
+        message: 'Pack name:',
+        default: () => {
+          const cwd = process.cwd();
+          return basename(cwd) + '-extensions';
+        },
+        validate: (input) => {
+          if (!input || input.trim().length === 0) {
+            return 'Pack name is required';
+          }
+          return true;
+        }
       }
     ]);
+    packName = result.packName;
+  }
 
-    if (selectedDir === '__custom__') {
-      scanDir = await browseDirectory('Browse for directory to scan:', homedir());
-    } else {
-      scanDir = selectedDir;
-    }
+  // Step 2: Detect extension directories
+  let scanDir;
+
+  if (options.dir) {
+    scanDir = options.dir;
+    console.log(colors.muted(`Scanning directory: ${scanDir}\n`));
   } else {
-    console.log(colors.muted('No extensions auto-detected.\n'));
-    scanDir = await browseDirectory('Browse for directory to scan:', homedir());
+    const detectSpinner = ora('Looking for extensions...').start();
+    const candidates = detectExtensionDirs();
+    detectSpinner.stop();
+
+    if (candidates.length > 0) {
+      const choices = candidates.map(c => ({
+        name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} ${colors.muted('—')} ${colors.muted(c.path)}`,
+        value: c.path,
+        short: c.label
+      }));
+      choices.push({ name: colors.muted('Browse for a directory...'), value: '__custom__', short: 'Custom' });
+
+      const { selectedDir } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'selectedDir',
+          message: 'Where to scan for extensions:',
+          choices
+        }
+      ]);
+
+      if (selectedDir === '__custom__') {
+        scanDir = await browseDirectory('Browse for directory to scan:', homedir());
+      } else {
+        scanDir = selectedDir;
+      }
+    } else {
+      console.log(colors.muted('No extensions auto-detected.\n'));
+      scanDir = await browseDirectory('Browse for directory to scan:', homedir());
+    }
   }
 
   // Step 3: Scan selected directory
@@ -126,26 +142,34 @@ export async function runCreateWizard() {
   console.log();
 
   // Step 4: Select extensions to include
-  const { selectedIndexes } = await inquirer.prompt([
-    {
-      type: 'checkbox',
-      name: 'selectedIndexes',
-      message: 'Select extensions to include:',
-      choices: extensions.map((ext, i) => ({
-        name: `${ext.name} (v${ext.version})`,
-        value: i,
-        checked: false
-      })),
-      validate: (answer) => {
-        if (answer.length === 0) {
-          return 'You must select at least one extension';
-        }
-        return true;
-      }
-    }
-  ]);
+  let selectedExtensions;
 
-  const selectedExtensions = selectedIndexes.map(i => extensions[i]);
+  if (options.yes) {
+    // Auto-select all extensions when -y flag is used
+    selectedExtensions = extensions;
+    console.log(colors.muted(`Selected all ${extensions.length} extension(s)\n`));
+  } else {
+    const { selectedIndexes } = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'selectedIndexes',
+        message: 'Select extensions to include:',
+        choices: extensions.map((ext, i) => ({
+          name: `${ext.name} (v${ext.version})`,
+          value: i,
+          checked: false
+        })),
+        validate: (answer) => {
+          if (answer.length === 0) {
+            return 'You must select at least one extension';
+          }
+          return true;
+        }
+      }
+    ]);
+
+    selectedExtensions = selectedIndexes.map(i => extensions[i]);
+  }
 
   // Warn if too many extensions selected
   if (selectedExtensions.length > 50) {
@@ -156,7 +180,7 @@ export async function runCreateWizard() {
   // Check for duplicate extensions
   const extensionNames = selectedExtensions.map(e => e.name);
   const duplicates = extensionNames.filter((name, index) => extensionNames.indexOf(name) !== index);
-  if (duplicates.length > 0) {
+  if (duplicates.length > 0 && !options.yes) {
     console.log(colors.warning(`\n⚠️  Warning: Duplicate extensions detected:`));
     const uniqueDuplicates = [...new Set(duplicates)];
     uniqueDuplicates.forEach(name => {
@@ -218,38 +242,52 @@ export async function runCreateWizard() {
 
   // Step 6: Optionally generate description with Ollama
   let generatedDescription = null;
-  const ollamaAvailable = await isOllamaRunning();
 
-  if (ollamaAvailable) {
-    const { useOllama } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'useOllama',
-        message: 'Generate description with Ollama?',
-        default: false
+  if (!options.yes) {
+    const ollamaAvailable = await isOllamaRunning();
+
+    if (ollamaAvailable) {
+      const { useOllama } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'useOllama',
+          message: 'Generate description with Ollama?',
+          default: false
+        }
+      ]);
+
+      if (useOllama) {
+        generatedDescription = await generateDescription(bundledExtensions);
       }
-    ]);
-
-    if (useOllama) {
-      generatedDescription = await generateDescription(bundledExtensions);
     }
   }
 
   // Step 7: Get pack description and author
-  const { description, author } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'description',
-      message: 'Pack description (optional):',
-      default: generatedDescription || `${bundledExtensions.length} browser extensions`
-    },
-    {
-      type: 'input',
-      name: 'author',
-      message: 'Author name (optional):',
-      default: process.env.USER || 'unknown'
-    }
-  ]);
+  let description, author;
+
+  if (options.yes) {
+    description = `${bundledExtensions.length} browser extensions`;
+    author = process.env.USER || 'unknown';
+    console.log(colors.muted(`Description: ${description}`));
+    console.log(colors.muted(`Author: ${author}\n`));
+  } else {
+    const result = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'description',
+        message: 'Pack description (optional):',
+        default: generatedDescription || `${bundledExtensions.length} browser extensions`
+      },
+      {
+        type: 'input',
+        name: 'author',
+        message: 'Author name (optional):',
+        default: process.env.USER || 'unknown'
+      }
+    ]);
+    description = result.description;
+    author = result.author;
+  }
 
   // Step 8: Choose output location
   const packsDir = join(homedir(), '.ext-pack', 'packs');
@@ -258,14 +296,25 @@ export async function runCreateWizard() {
   }
 
   const defaultFileName = `${packName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
-  const { outputFile } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'outputFile',
-      message: 'Save pack as:',
-      default: join(packsDir, defaultFileName)
-    }
-  ]);
+  let outputFile;
+
+  if (options.output) {
+    outputFile = options.output;
+    console.log(colors.muted(`Output file: ${outputFile}\n`));
+  } else if (options.yes) {
+    outputFile = join(packsDir, defaultFileName);
+    console.log(colors.muted(`Output file: ${outputFile}\n`));
+  } else {
+    const result = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'outputFile',
+        message: 'Save pack as:',
+        default: join(packsDir, defaultFileName)
+      }
+    ]);
+    outputFile = result.outputFile;
+  }
 
   // Create pack
   const pack = createPack(
@@ -290,39 +339,41 @@ export async function runCreateWizard() {
       `Created: ${pack.created}`
     ));
 
-    // Suggest next actions
-    const { nextAction } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'nextAction',
-        message: 'What would you like to do next?',
-        choices: [
-          {
-            name: 'Install this pack',
-            value: 'install',
-            short: 'Install'
-          },
-          {
-            name: 'Share this pack',
-            value: 'share',
-            short: 'Share'
-          },
-          new inquirer.Separator(),
-          {
-            name: colors.muted('Return to main menu'),
-            value: 'menu',
-            short: 'Menu'
-          }
-        ]
-      }
-    ]);
+    // Suggest next actions (skip if -y flag is used)
+    if (!options.yes) {
+      const { nextAction } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'nextAction',
+          message: 'What would you like to do next?',
+          choices: [
+            {
+              name: 'Install this pack',
+              value: 'install',
+              short: 'Install'
+            },
+            {
+              name: 'Share this pack',
+              value: 'share',
+              short: 'Share'
+            },
+            new inquirer.Separator(),
+            {
+              name: colors.muted('Return to main menu'),
+              value: 'menu',
+              short: 'Menu'
+            }
+          ]
+        }
+      ]);
 
-    if (nextAction === 'install') {
-      const { runInstallWizard } = await import('./install-wizard.js');
-      await runInstallWizard(outputFile);
-    } else if (nextAction === 'share') {
-      const { runShareWizard } = await import('./share-wizard.js');
-      await runShareWizard(outputFile);
+      if (nextAction === 'install') {
+        const { runInstallWizard } = await import('./install-wizard.js');
+        await runInstallWizard(outputFile);
+      } else if (nextAction === 'share') {
+        const { runShareWizard } = await import('./share-wizard.js');
+        await runShareWizard(outputFile);
+      }
     }
 
     return outputFile;

@@ -3,6 +3,7 @@
  */
 
 import inquirer from 'inquirer';
+import autocomplete from 'inquirer-autocomplete-prompt';
 import ora from 'ora';
 import cliProgress from 'cli-progress';
 import { resolve, join } from 'path';
@@ -14,6 +15,9 @@ import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
 import { getConfig } from '../utils/config-manager.js';
 import { getPackInfo, downloadPack, isRegistryAccessible } from '../core/registry-client.js';
+
+// Register autocomplete prompt
+inquirer.registerPrompt('autocomplete', autocomplete);
 
 /**
  * Run the install pack wizard
@@ -44,37 +48,69 @@ export async function runInstallWizard(packFile = null) {
         return false;
       }
 
-      // Fetch popular packs from registry
+      checkSpinner.succeed('Registry accessible');
+
+      // Optional: Choose sort order
+      const { sortBy } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'sortBy',
+          message: 'Sort packs by:',
+          choices: [
+            { name: 'Most popular (downloads)', value: 'downloads' },
+            { name: 'Most starred', value: 'stars' },
+            { name: 'Recently updated', value: 'updated' },
+            { name: 'Name (A-Z)', value: 'name' }
+          ],
+          default: 'downloads'
+        }
+      ]);
+
+      // Fuzzy finder for pack selection
       const { searchPacks } = await import('../core/registry-client.js');
-      const packs = await searchPacks('', { sortBy: 'downloads', limit: 10 });
+      let allPacks = null; // Cache all packs for fuzzy search
 
-      checkSpinner.succeed(`Found ${packs.length} pack(s)`);
+      const { selectedPack } = await inquirer.prompt([
+        {
+          type: 'autocomplete',
+          name: 'selectedPack',
+          message: 'Search and select pack to install:',
+          source: async (answersSoFar, input) => {
+            // Fetch all packs on first load
+            if (!allPacks) {
+              allPacks = await searchPacks('', { sortBy, limit: 100 });
+            }
 
-      if (packs.length === 0) {
-        console.log(errorBox('No packs available in registry yet.'));
+            // Fuzzy filter by input
+            const query = (input || '').toLowerCase();
+            const filtered = allPacks.filter(pack => {
+              if (!query) return true;
+              const matchesName = pack.name?.toLowerCase().includes(query);
+              const matchesDesc = pack.description?.toLowerCase().includes(query);
+              const matchesAuthor = pack.author?.name?.toLowerCase().includes(query);
+              const matchesTags = pack.tags?.some(tag => tag.toLowerCase().includes(query));
+              return matchesName || matchesDesc || matchesAuthor || matchesTags;
+            });
+
+            if (filtered.length === 0) {
+              return [{ name: colors.muted('No packs found'), value: null, disabled: true }];
+            }
+
+            return filtered.map(pack => ({
+              name: `${colors.highlight(pack.name)} ${colors.muted(`(${pack.extensions || 0} ext)`)} - ${pack.description || 'No description'}`,
+              value: pack.id,
+              short: pack.name
+            }));
+          },
+          pageSize: 15
+        }
+      ]);
+
+      if (!selectedPack) {
+        console.log(errorBox('No pack selected.'));
         await pause();
         return false;
       }
-
-      // Show pack browser
-      console.log(colors.bold('\n  Available Packs:\n'));
-
-      const choices = packs.map((pack, i) => ({
-        name: `${i + 1}. ${colors.highlight(pack.name)} ${colors.muted(`(${pack.extensions} ext)`)} - ${pack.description || 'No description'}`,
-        value: pack.id,
-        short: pack.name
-      }));
-
-      const inquirer = (await import('inquirer')).default;
-      const { selectedPack } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'selectedPack',
-          message: 'Select pack to install:',
-          choices,
-          pageSize: 10
-        }
-      ]);
 
       selectedPackFile = selectedPack;
       isFromRegistry = true;

@@ -122,7 +122,9 @@ export async function runInstallWizard(packFile = null) {
 
       // Download pack to temp directory
       const tempDir = tmpdir();
-      packPath = join(tempDir, `${packInfo.id}.extpack`);
+      // Replace / in pack ID to avoid nested directories
+      const safePackId = packInfo.id.replace(/\//g, '-');
+      packPath = join(tempDir, `${safePackId}.extpack`);
 
       const downloadSpinner = ora('Downloading pack...').start();
 

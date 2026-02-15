@@ -17,7 +17,7 @@ const program = new Command();
 program
   .name('ext-pack')
   .description('Bundle and install browser extensions with zero friction')
-  .version('3.0.2');
+  .version('3.0.3');
 
 // Register all commands
 program.addCommand(createCommand);

@@ -1,6 +1,6 @@
 {
   "name": "ext-pack",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "description": "Bundle and install Chrome/Brave extensions with zero friction",
   "type": "module",
   "bin": {

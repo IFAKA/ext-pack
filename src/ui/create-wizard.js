@@ -9,7 +9,7 @@ import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
-import { colors, successBox, errorBox, clearScreen, pause } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, pause, browseDirectory } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
@@ -84,20 +84,13 @@ export async function runCreateWizard(options = {}) {
       ]);
 
       if (selectedDir === '__custom__') {
-        const { customPath } = await inquirer.prompt([
-          {
-            type: 'input',
-            name: 'customPath',
-            message: 'Path to extensions directory:',
-            validate: (input) => {
-              if (!input) return 'Path is required';
-              if (!existsSync(input)) return 'Directory not found';
-              return true;
-            }
-          }
-        ]);
-        scanDir = customPath;
-        packName = options.name || basename(customPath);
+        // Use fuzzy finder to browse directories
+        scanDir = await browseDirectory('Browse for directory with extensions:', homedir());
+        if (!scanDir) {
+          console.log(colors.muted('\nCancelled.\n'));
+          return null;
+        }
+        packName = options.name || basename(scanDir);
       } else {
         scanDir = selectedDir;
         const selected = candidates.find(c => c.path === selectedDir);

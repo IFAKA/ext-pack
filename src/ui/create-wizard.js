@@ -1,25 +1,26 @@
 /**
- * Interactive wizard for creating extension packs
+ * Smart wizard for creating extension packs
+ * Philosophy: Smart defaults, minimal prompts, zero configuration
  */
 
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { homedir } from 'os';
+import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import { basename, resolve, join } from 'path';
-import { colors, successBox, errorBox, clearScreen, browseDirectory, pause } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, pause } from './helpers.js';
 import { scanDirectory } from '../core/extension-scanner.js';
 import { createPack, writePackFile } from '../core/pack-codec.js';
 import { getPlatform } from '../utils/browser-detector.js';
 import { bundleExtension, calculateBundleSize } from '../core/bundle-codec.js';
 
 /**
- * Run the create pack wizard
+ * Run the create pack wizard with smart defaults
  * @param {Object} options - Command options
- * @param {string} options.name - Pack name
- * @param {string} options.dir - Directory to scan
- * @param {string} options.output - Output file path
- * @param {boolean} options.yes - Skip confirmations
+ * @param {string} options.name - Pack name (optional)
+ * @param {string} options.dir - Directory to scan (optional)
+ * @param {string} options.output - Output file path (optional)
  * @returns {Promise<string|null>} Path to created pack file or null if cancelled
  */
 export async function runCreateWizard(options = {}) {
@@ -27,89 +28,84 @@ export async function runCreateWizard(options = {}) {
 
   console.log(colors.bold('\n  Create Extension Pack\n'));
 
-  // Step 1: Get pack name
-  let packName;
-  if (options.name) {
-    packName = options.name;
-    console.log(colors.muted(`Pack name: ${packName}\n`));
-  } else {
-    const result = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'packName',
-        message: 'Pack name:',
-        default: () => {
-          const cwd = process.cwd();
-          return basename(cwd) + '-extensions';
-        },
-        validate: (input) => {
-          if (!input || input.trim().length === 0) {
-            return 'Pack name is required';
-          }
-          return true;
-        }
-      }
-    ]);
-    packName = result.packName;
-  }
+  // Smart detection: Find extensions automatically
+  const detectSpinner = ora('Looking for extensions...').start();
 
-  // Step 2: Detect extension directories
   let scanDir;
+  let packName;
 
-  if (options.dir) {
-    scanDir = options.dir;
-    console.log(colors.muted(`Scanning directory: ${scanDir}\n`));
-  } else {
-    const detectSpinner = ora('Looking for extensions...').start();
-    const candidates = detectExtensionDirs();
-    detectSpinner.stop();
+  // 1. Try current directory first if no dir specified
+  if (!options.dir) {
+    const cwd = process.cwd();
+    const cwdScan = scanDirectory(cwd, { maxDepth: 2 });
 
-    if (candidates.length > 0) {
-      const choices = candidates.map(c => ({
-        name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)} ${colors.muted('—')} ${colors.muted(c.path)}`,
-        value: c.path,
-        short: c.label
-      }));
-      choices.push({ name: colors.muted('Browse for a directory...'), value: '__custom__', short: 'Custom' });
-
-      const { selectedDir } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'selectedDir',
-          message: 'Where to scan for extensions:',
-          choices
-        }
-      ]);
-
-      if (selectedDir === '__custom__') {
-        scanDir = await browseDirectory('Browse for directory to scan:', homedir());
-      } else {
-        scanDir = selectedDir;
-      }
+    if (cwdScan.extensions.length > 0) {
+      // Found extensions in current directory - use it!
+      scanDir = cwd;
+      packName = options.name || basename(cwd);
+      detectSpinner.succeed(`Found ${cwdScan.extensions.length} extension(s) in current directory`);
     } else {
-      console.log(colors.muted('No extensions auto-detected.\n'));
-      scanDir = await browseDirectory('Browse for directory to scan:', homedir());
+      // Not in current dir, check common browser locations
+      const candidates = detectExtensionDirs();
+      detectSpinner.stop();
+
+      if (candidates.length === 0) {
+        console.log(errorBox(
+          'No extensions found.\n\n' +
+          colors.muted('Run this command from a directory containing extensions,\n') +
+          colors.muted('or specify a directory with: ext-pack create -d <path>')
+        ));
+        await pause();
+        return null;
+      }
+
+      if (candidates.length === 1) {
+        // Only one candidate - use it automatically
+        scanDir = candidates[0].path;
+        packName = options.name || candidates[0].label.toLowerCase() + '-extensions';
+        console.log(colors.success(`Using ${candidates[0].label} extensions (${candidates[0].count} found)\n`));
+      } else {
+        // Multiple candidates - need to ask
+        const choices = candidates.map(c => ({
+          name: `${c.label} ${colors.muted(`(${c.count} extension${c.count !== 1 ? 's' : ''})`)}`,
+          value: c.path,
+          short: c.label
+        }));
+
+        const { selectedDir } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'selectedDir',
+            message: 'Where to scan for extensions:',
+            choices
+          }
+        ]);
+
+        scanDir = selectedDir;
+        const selected = candidates.find(c => c.path === selectedDir);
+        packName = options.name || selected.label.toLowerCase() + '-extensions';
+      }
     }
+  } else {
+    // Directory specified via option
+    scanDir = options.dir;
+    packName = options.name || basename(scanDir);
+    detectSpinner.succeed('Scanning specified directory');
   }
 
-  // Step 3: Scan selected directory
+  // 2. Scan the selected directory
   const spinner = ora('Scanning for extensions...').start();
-
   const scanPath = resolve(scanDir);
-  let lastUpdate = Date.now();
 
   const { extensions, errors } = scanDirectory(scanPath, {
     onProgress: (progress) => {
-      // Throttle updates to avoid too many spinner updates
-      const now = Date.now();
-      if (now - lastUpdate > 200) {
-        spinner.text = `Scanning... (${progress.directoriesScanned} dirs, ${progress.extensionsFound} found)`;
-        lastUpdate = now;
+      if (progress.extensionsFound > 0) {
+        spinner.text = `Scanning... (${progress.extensionsFound} found)`;
       }
     }
   });
 
-  spinner.succeed(`Scan complete (${extensions.length} extensions found)`);
+  spinner.succeed(`Found ${extensions.length} extension(s)`);
 
   if (extensions.length === 0) {
     console.log(errorBox(
@@ -118,7 +114,7 @@ export async function runCreateWizard(options = {}) {
     ));
 
     if (errors.length > 0) {
-      console.log(colors.warning('Errors encountered:'));
+      console.log(colors.warning('\nErrors encountered:'));
       errors.forEach(err => {
         console.log(colors.muted(`  ${err.path}: ${err.error}`));
       });
@@ -129,85 +125,23 @@ export async function runCreateWizard(options = {}) {
     return null;
   }
 
-  console.log(colors.success(`\nFound ${extensions.length} extension(s)\n`));
-
-  // Show extensions with descriptions
+  // Show what we found
+  console.log();
   extensions.forEach((ext, i) => {
     const num = colors.muted(`${i + 1}.`);
     const name = colors.highlight(ext.name);
     const version = colors.muted(`v${ext.version}`);
-    const desc = ext.description ? colors.muted(`\n     ${ext.description}`) : '';
-    console.log(`  ${num} ${name} ${version}${desc}`);
+    console.log(`  ${num} ${name} ${version}`);
   });
   console.log();
 
-  // Step 4: Select extensions to include
-  let selectedExtensions;
+  // 3. Include ALL extensions by default (smart!)
+  const selectedExtensions = extensions;
+  console.log(colors.success(`Including all ${extensions.length} extension(s)\n`));
 
-  if (options.yes) {
-    // Auto-select all extensions when -y flag is used
-    selectedExtensions = extensions;
-    console.log(colors.muted(`Selected all ${extensions.length} extension(s)\n`));
-  } else {
-    const { selectedIndexes } = await inquirer.prompt([
-      {
-        type: 'checkbox',
-        name: 'selectedIndexes',
-        message: 'Select extensions to include:',
-        choices: extensions.map((ext, i) => ({
-          name: `${ext.name} (v${ext.version})`,
-          value: i,
-          checked: false
-        })),
-        validate: (answer) => {
-          if (answer.length === 0) {
-            return 'You must select at least one extension';
-          }
-          return true;
-        }
-      }
-    ]);
-
-    selectedExtensions = selectedIndexes.map(i => extensions[i]);
-  }
-
-  // Warn if too many extensions selected
-  if (selectedExtensions.length > 50) {
-    console.log(colors.warning(`\n⚠️  You selected ${selectedExtensions.length} extensions.`));
-    console.log(colors.muted('Large packs may be slow to process and generate very long URLs.\n'));
-  }
-
-  // Check for duplicate extensions
-  const extensionNames = selectedExtensions.map(e => e.name);
-  const duplicates = extensionNames.filter((name, index) => extensionNames.indexOf(name) !== index);
-  if (duplicates.length > 0 && !options.yes) {
-    console.log(colors.warning(`\n⚠️  Warning: Duplicate extensions detected:`));
-    const uniqueDuplicates = [...new Set(duplicates)];
-    uniqueDuplicates.forEach(name => {
-      console.log(colors.muted(`   - ${name}`));
-    });
-    console.log();
-
-    const { continueDuplicates } = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'continueDuplicates',
-        message: 'Continue with duplicates?',
-        default: false
-      }
-    ]);
-
-    if (!continueDuplicates) {
-      console.log(errorBox('Pack creation cancelled.'));
-      await pause();
-      return null;
-    }
-  }
-
-  // Step 5: Bundle local extensions
+  // 4. Bundle extensions
   const bundleSpinner = ora('Bundling extensions...').start();
 
-  let totalOriginalSize = 0;
   let totalBundledSize = 0;
   const bundledExtensions = [];
 
@@ -219,9 +153,6 @@ export async function runCreateWizard(options = {}) {
 
         bundledExtensions.push(bundled);
         totalBundledSize += bundledSize;
-
-        // Estimate original size (base64 content length is roughly the compressed size)
-        totalOriginalSize += bundledSize * 1.3; // Rough estimate
       } catch (err) {
         bundleSpinner.fail(`Failed to bundle ${ext.name}`);
         console.log(errorBox(
@@ -232,7 +163,6 @@ export async function runCreateWizard(options = {}) {
         return null;
       }
     } else {
-      // Keep non-local extensions as-is
       bundledExtensions.push(ext);
     }
   }
@@ -240,91 +170,25 @@ export async function runCreateWizard(options = {}) {
   const bundledSizeMB = (totalBundledSize / 1024 / 1024).toFixed(2);
   bundleSpinner.succeed(`Extensions bundled (${bundledSizeMB} MB compressed)`);
 
-  // Step 6: Optionally generate description with Ollama
-  let generatedDescription = null;
+  // 5. Smart defaults for metadata
+  const description = `${bundledExtensions.length} browser extensions`;
+  const author = getAuthor();
 
-  if (!options.yes) {
-    const ollamaAvailable = await isOllamaRunning();
+  console.log(colors.muted(`Pack: ${packName}`));
+  console.log(colors.muted(`Description: ${description}`));
+  console.log(colors.muted(`Author: ${author}\n`));
 
-    if (ollamaAvailable) {
-      const { useOllama } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'useOllama',
-          message: 'Generate description with Ollama?',
-          default: false
-        }
-      ]);
-
-      if (useOllama) {
-        generatedDescription = await generateDescription(bundledExtensions);
-      }
-    }
-  }
-
-  // Step 7: Get pack description and author
-  let description, author;
-
-  if (options.yes) {
-    description = `${bundledExtensions.length} browser extensions`;
-    author = process.env.USER || 'unknown';
-    console.log(colors.muted(`Description: ${description}`));
-    console.log(colors.muted(`Author: ${author}\n`));
-  } else {
-    const result = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'description',
-        message: 'Pack description (optional):',
-        default: generatedDescription || `${bundledExtensions.length} browser extensions`
-      },
-      {
-        type: 'input',
-        name: 'author',
-        message: 'Author name (optional):',
-        default: process.env.USER || 'unknown'
-      }
-    ]);
-    description = result.description;
-    author = result.author;
-  }
-
-  // Step 8: Choose output location
+  // 6. Smart output location
   const packsDir = join(homedir(), '.ext-pack', 'packs');
   if (!existsSync(packsDir)) {
     mkdirSync(packsDir, { recursive: true });
   }
 
   const defaultFileName = `${packName.toLowerCase().replace(/\s+/g, '-')}.extpack`;
-  let outputFile;
+  const outputFile = options.output || join(packsDir, defaultFileName);
 
-  if (options.output) {
-    outputFile = options.output;
-    console.log(colors.muted(`Output file: ${outputFile}\n`));
-  } else if (options.yes) {
-    outputFile = join(packsDir, defaultFileName);
-    console.log(colors.muted(`Output file: ${outputFile}\n`));
-  } else {
-    const result = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'outputFile',
-        message: 'Save pack as:',
-        default: join(packsDir, defaultFileName)
-      }
-    ]);
-    outputFile = result.outputFile;
-  }
-
-  // Create pack
-  const pack = createPack(
-    packName,
-    description,
-    author,
-    bundledExtensions
-  );
-
-  // Write pack file
+  // 7. Create and save pack
+  const pack = createPack(packName, description, author, bundledExtensions);
   const saveSpinner = ora('Saving pack...').start();
 
   try {
@@ -335,46 +199,8 @@ export async function runCreateWizard(options = {}) {
       `Pack: ${colors.highlight(pack.name)}\n\n` +
       `File: ${outputFile}\n` +
       `Extensions: ${bundledExtensions.length}\n` +
-      `Size: ${bundledSizeMB} MB\n` +
-      `Created: ${pack.created}`
+      `Size: ${bundledSizeMB} MB`
     ));
-
-    // Suggest next actions (skip if -y flag is used)
-    if (!options.yes) {
-      const { nextAction } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'nextAction',
-          message: 'What would you like to do next?',
-          choices: [
-            {
-              name: 'Install this pack',
-              value: 'install',
-              short: 'Install'
-            },
-            {
-              name: 'Share this pack',
-              value: 'share',
-              short: 'Share'
-            },
-            new inquirer.Separator(),
-            {
-              name: colors.muted('Return to main menu'),
-              value: 'menu',
-              short: 'Menu'
-            }
-          ]
-        }
-      ]);
-
-      if (nextAction === 'install') {
-        const { runInstallWizard } = await import('./install-wizard.js');
-        await runInstallWizard(outputFile);
-      } else if (nextAction === 'share') {
-        const { runShareWizard } = await import('./share-wizard.js');
-        await runShareWizard(outputFile);
-      }
-    }
 
     return outputFile;
   } catch (err) {
@@ -388,6 +214,20 @@ export async function runCreateWizard(options = {}) {
     await pause();
     return null;
   }
+}
+
+/**
+ * Get author name from git config or environment
+ */
+function getAuthor() {
+  try {
+    // Try git config first
+    const gitUser = execSync('git config user.name', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+    if (gitUser) return gitUser;
+  } catch {}
+
+  // Fallback to USER env var
+  return process.env.USER || 'unknown';
 }
 
 /**
@@ -419,15 +259,6 @@ const EXTENSION_DIRS = {
  */
 function detectExtensionDirs() {
   const results = [];
-
-  // Check cwd first
-  const cwd = process.cwd();
-  const cwdScan = scanDirectory(cwd, { maxDepth: 2 });
-  if (cwdScan.extensions.length > 0) {
-    results.push({ label: 'Current directory', path: cwd, count: cwdScan.extensions.length });
-  }
-
-  // Check known browser extension dirs
   const platform = getPlatform();
   const knownDirs = EXTENSION_DIRS[platform] || [];
 
@@ -441,112 +272,4 @@ function detectExtensionDirs() {
   }
 
   return results;
-}
-
-/**
- * Check if Ollama is running locally
- */
-async function isOllamaRunning() {
-  try {
-    const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Get list of available Ollama models
- */
-async function getAvailableModels() {
-  try {
-    const res = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2000) });
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    return data.models?.map(m => m.name) || [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Select the best model for description generation
- * Prefers smaller, faster models suitable for simple text generation
- */
-function selectBestModel(availableModels) {
-  // Preferred models in order (smaller/faster first)
-  const preferred = [
-    'qwen2.5:1.5b',
-    'qwen2.5:3b',
-    'llama3.2:1b',
-    'llama3.2:3b',
-    'llama3.2',
-    'qwen2.5:7b',
-    'llama3.1:8b',
-    'llama3:8b',
-    'qwen2.5',
-    'llama3.1',
-    'llama3'
-  ];
-
-  // Try to find a preferred model
-  for (const model of preferred) {
-    const match = availableModels.find(m => m.startsWith(model));
-    if (match) return match;
-  }
-
-  // Fallback to first available model
-  return availableModels[0] || null;
-}
-
-/**
- * Generate a pack description using Ollama
- */
-async function generateDescription(extensions) {
-  const extList = extensions.map(e => `${e.name}: ${e.description || 'no description'}`).join(', ');
-  const prompt = `Write a single short sentence (under 15 words) describing this browser extension pack containing: ${extList}. Reply with only the sentence, no quotes.`;
-
-  const spinner = ora('Checking available models...').start();
-
-  try {
-    // Get available models
-    const models = await getAvailableModels();
-    const model = selectBestModel(models);
-
-    if (!model) {
-      spinner.fail('No Ollama models found');
-      console.log(colors.muted('  Run "ollama pull llama3.2" to install a model\n'));
-      return null;
-    }
-
-    spinner.text = `Generating description with ${model}...`;
-
-    const res = await fetch('http://127.0.0.1:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false
-      }),
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!res.ok) {
-      const error = await res.text().catch(() => 'Unknown error');
-      spinner.fail('Failed to generate description');
-      console.log(colors.muted(`  ${error}\n`));
-      return null;
-    }
-
-    const data = await res.json();
-    const text = data.response?.trim();
-    spinner.succeed('Description generated');
-    return text || null;
-  } catch (err) {
-    spinner.fail('Failed to generate description');
-    console.log(colors.muted(`  ${err.message}\n`));
-    return null;
-  }
 }

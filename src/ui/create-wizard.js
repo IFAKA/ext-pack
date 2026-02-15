@@ -228,7 +228,7 @@ export async function runCreateWizard(options = {}) {
         const descSpinner = ora('Generating description with Ollama...').start();
 
         const extensionList = selectedExtensions.map(ext => ext.name).join(', ');
-        const prompt = `Write a concise 1-sentence description (max 60 characters) for a browser extension pack containing: ${extensionList}. Only output the description, nothing else.`;
+        const prompt = `Write a short description (under 100 characters) for a browser extension pack containing: ${extensionList}. Be concise and clear. Only output the description text, no quotes or extra words.`;
 
         const response = await fetch('http://localhost:11434/api/generate', {
           method: 'POST',
@@ -237,15 +237,28 @@ export async function runCreateWizard(options = {}) {
             model: model,
             prompt: prompt,
             stream: false,
-            options: { temperature: 0.7, num_predict: 30 }
+            options: {
+              temperature: 0.5,
+              num_predict: 50,
+              stop: ['\n', '.', '!']
+            }
           }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(10000)
         });
 
         if (response.ok) {
           const data = await response.json();
-          const generated = data.response.trim().replace(/['"]/g, '');
-          if (generated.length > 0 && generated.length < 100) {
+          let generated = data.response.trim().replace(/['"]/g, '');
+
+          // Truncate if too long
+          if (generated.length > 150) {
+            generated = generated.substring(0, 147) + '...';
+          }
+
+          // Remove leading labels like "Here is:" or "Description:"
+          generated = generated.replace(/^(Here is|Description|Pack description|Here's):\s*/i, '');
+
+          if (generated.length > 0) {
             suggestedDescription = generated;
             descSpinner.succeed(`Generated: "${generated}"`);
           } else {

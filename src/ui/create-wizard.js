@@ -211,6 +211,55 @@ export async function runCreateWizard(options = {}) {
 
   // 5. Get pack metadata from user
   console.log();
+
+  // Try to auto-generate description with Ollama
+  let suggestedDescription = `${bundledExtensions.length} browser extensions`;
+
+  try {
+    const ollamaCheck = await fetch('http://localhost:11434/api/tags', {
+      signal: AbortSignal.timeout(1000)
+    });
+
+    if (ollamaCheck.ok) {
+      const modelsData = await ollamaCheck.json();
+      const model = modelsData.models?.[0]?.name;
+
+      if (model) {
+        const descSpinner = ora('Generating description with Ollama...').start();
+
+        const extensionList = selectedExtensions.map(ext => ext.name).join(', ');
+        const prompt = `Write a concise 1-sentence description (max 60 characters) for a browser extension pack containing: ${extensionList}. Only output the description, nothing else.`;
+
+        const response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: model,
+            prompt: prompt,
+            stream: false,
+            options: { temperature: 0.7, num_predict: 30 }
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const generated = data.response.trim().replace(/['"]/g, '');
+          if (generated.length > 0 && generated.length < 100) {
+            suggestedDescription = generated;
+            descSpinner.succeed(`Generated: "${generated}"`);
+          } else {
+            descSpinner.info('Using default description');
+          }
+        } else {
+          descSpinner.info('Using default description');
+        }
+      }
+    }
+  } catch {
+    // Ollama not available, use default
+  }
+
   const { finalPackName, packDescription } = await inquirer.prompt([
     {
       type: 'input',
@@ -228,7 +277,7 @@ export async function runCreateWizard(options = {}) {
       type: 'input',
       name: 'packDescription',
       message: 'Description:',
-      default: `${bundledExtensions.length} browser extensions`,
+      default: suggestedDescription,
       validate: (input) => {
         if (!input || input.trim().length === 0) {
           return 'Description cannot be empty';

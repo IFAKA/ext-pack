@@ -48,7 +48,7 @@ async function getGitHubUsername(octokit) {
  * @param {Object} pack - Pack object
  * @returns {Object} Pack metadata
  */
-function calculatePackMetadata(pack) {
+function calculatePackMetadata(pack, authorGithub) {
   let totalSize = 0;
 
   // Calculate size from bundled extensions
@@ -58,11 +58,16 @@ function calculatePackMetadata(pack) {
     }
   });
 
+  // Namespace pack ID by author (like npm scopes: @user/package)
+  const packSlug = pack.name.toLowerCase().replace(/\s+/g, '-');
+  const namespacedId = `${authorGithub}/${packSlug}`;
+
   return {
-    id: pack.name.toLowerCase().replace(/\s+/g, '-'),
+    id: namespacedId,
     name: pack.name,
     description: pack.description || '',
     author: pack.author || {},
+    authorGithub: authorGithub,
     version: pack.version || '1.0.0',
     extensions: pack.extensions.length,
     size: totalSize,
@@ -83,7 +88,6 @@ function calculatePackMetadata(pack) {
 export async function publishPack(packPath, options = {}) {
   // Read and validate pack
   const pack = await readPackFile(packPath);
-  const metadata = calculatePackMetadata(pack);
 
   // Get GitHub token
   const token = await getGitHubToken();
@@ -91,6 +95,9 @@ export async function publishPack(packPath, options = {}) {
 
   // Get current user
   const username = await getGitHubUsername(octokit);
+
+  // Calculate metadata with namespaced ID
+  const metadata = calculatePackMetadata(pack, username);
 
   // Determine release tag
   const tag = options.tag || `${metadata.id}-v${metadata.version}`;

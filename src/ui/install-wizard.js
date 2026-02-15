@@ -8,7 +8,7 @@ import cliProgress from 'cli-progress';
 import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, selectPackFile, pause } from './helpers.js';
+import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, findPackFileSmart, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -25,13 +25,13 @@ export async function runInstallWizard(packFile = null) {
 
   console.log(colors.bold('\n  Install Extension Pack\n'));
 
-  // Step 1: Get pack file or name
+  // Step 1: Get pack file or name (smart auto-detection!)
   let selectedPackFile = packFile;
   let packPath = null;
   let isFromRegistry = false;
 
   if (!selectedPackFile) {
-    selectedPackFile = await selectPackFile();
+    selectedPackFile = await findPackFileSmart();
     if (!selectedPackFile) {
       return false;
     }

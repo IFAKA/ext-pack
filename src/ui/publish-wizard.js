@@ -6,7 +6,7 @@ import { resolve } from 'path';
 import { existsSync } from 'fs';
 import inquirer from 'inquirer';
 import ora from 'ora';
-import { colors, successBox, errorBox, clearScreen, pause } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, findPackFileSmart, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { publishPack, hasGitHubAuth } from '../core/github-publisher.js';
 
@@ -20,24 +20,12 @@ export async function runPublishWizard(packPath = null, options = {}) {
 
   console.log(colors.bold('\n  📦 Publish to Registry\n'));
 
-  // Step 1: Select pack file if not provided
+  // Step 1: Select pack file if not provided (smart auto-detection!)
   if (!packPath) {
-    const { selectedFile } = await inquirer.prompt([
-      {
-        type: 'input',
-        name: 'selectedFile',
-        message: 'Pack file path:',
-        validate: (input) => {
-          if (!input) return 'Pack file is required';
-          const path = resolve(input);
-          if (!existsSync(path)) return 'File not found';
-          if (!path.endsWith('.extpack')) return 'Must be an .extpack file';
-          return true;
-        }
-      }
-    ]);
-
-    packPath = resolve(selectedFile);
+    packPath = await findPackFileSmart('Select pack to publish:');
+    if (!packPath) {
+      return;
+    }
   } else {
     packPath = resolve(packPath);
 

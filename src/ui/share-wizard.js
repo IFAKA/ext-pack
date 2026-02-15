@@ -6,7 +6,7 @@ import inquirer from 'inquirer';
 import qrcode from 'qrcode-terminal';
 import { resolve, basename } from 'path';
 import { existsSync } from 'fs';
-import { colors, successBox, errorBox, clearScreen, copyToClipboardMac, selectPackFile, pause } from './helpers.js';
+import { colors, successBox, errorBox, clearScreen, copyToClipboardMac, findPackFileSmart, pause } from './helpers.js';
 import { readPackFile, generateUrl } from '../core/pack-codec.js';
 
 /**
@@ -19,11 +19,11 @@ export async function runShareWizard(packFile = null) {
 
   console.log(colors.bold('\n  Share Extension Pack\n'));
 
-  // Step 1: Get pack file
+  // Step 1: Get pack file (smart auto-detection!)
   let selectedPackFile = packFile;
 
   if (!selectedPackFile) {
-    selectedPackFile = await selectPackFile('Select pack to share:', true);
+    selectedPackFile = await findPackFileSmart('Select pack to share:', true);
     if (!selectedPackFile) {
       return;
     }

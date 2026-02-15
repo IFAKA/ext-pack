@@ -177,6 +177,48 @@ export async function copyToClipboardMac(text, promptMessage = 'Copy to clipboar
 }
 
 /**
+ * Smart auto-detection of pack files
+ * Returns pack file automatically if only one found, otherwise prompts
+ * @param {string} promptMessage
+ * @param {boolean} showInstalled - Include installed packs in list
+ * @returns {Promise<string|null>} Pack file path or null if cancelled
+ */
+export async function findPackFileSmart(promptMessage = 'Select pack file:', showInstalled = false) {
+  const { existsSync, readdirSync } = await import('fs');
+  const { join } = await import('path');
+  const { homedir } = await import('os');
+
+  // 1. Check current directory first
+  const cwd = process.cwd();
+  const localFiles = existsSync(cwd)
+    ? readdirSync(cwd).filter(f => f.endsWith('.extpack'))
+    : [];
+
+  // If exactly 1 file in current directory, use it automatically!
+  if (localFiles.length === 1) {
+    const packPath = join(cwd, localFiles[0]);
+    console.log(colors.muted(`Using pack: ${localFiles[0]}\n`));
+    return packPath;
+  }
+
+  // 2. Check ~/.ext-pack/packs/ directory
+  const packsDir = join(homedir(), '.ext-pack', 'packs');
+  const defaultPacks = existsSync(packsDir)
+    ? readdirSync(packsDir).filter(f => f.endsWith('.extpack'))
+    : [];
+
+  // If no local files but exactly 1 in default location, use it!
+  if (localFiles.length === 0 && defaultPacks.length === 1) {
+    const packPath = join(packsDir, defaultPacks[0]);
+    console.log(colors.muted(`Using pack: ${defaultPacks[0]}\n`));
+    return packPath;
+  }
+
+  // Multiple files found or none found - need to prompt
+  return selectPackFile(promptMessage, showInstalled);
+}
+
+/**
  * Select a pack file interactively
  * @param {string} promptMessage - Prompt message
  * @param {boolean} showInstalled - Include installed packs from registry

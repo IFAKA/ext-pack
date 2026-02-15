@@ -32,8 +32,6 @@ export async function runInstallWizard(packFile = null) {
 
   if (!selectedPackFile) {
     // No pack specified - show registry browser
-    const inquirer = (await import('inquirer')).default;
-
     const checkSpinner = ora('Fetching registry...').start();
 
     try {
@@ -46,15 +44,40 @@ export async function runInstallWizard(packFile = null) {
         return false;
       }
 
-      // TODO: Fetch and show registry packs
-      checkSpinner.warn('Registry browser not implemented yet');
-      console.log(errorBox(
-        'Please specify a pack to install:\n\n' +
-        '  ext-pack install <pack-name>     # From registry\n' +
-        '  ext-pack install <file.extpack>  # From file'
-      ));
-      await pause();
-      return false;
+      // Fetch popular packs from registry
+      const { searchPacks } = await import('../core/registry-client.js');
+      const packs = await searchPacks('', { sortBy: 'downloads', limit: 10 });
+
+      checkSpinner.succeed(`Found ${packs.length} pack(s)`);
+
+      if (packs.length === 0) {
+        console.log(errorBox('No packs available in registry yet.'));
+        await pause();
+        return false;
+      }
+
+      // Show pack browser
+      console.log(colors.bold('\n  Available Packs:\n'));
+
+      const choices = packs.map((pack, i) => ({
+        name: `${i + 1}. ${colors.highlight(pack.name)} ${colors.muted(`(${pack.extensions} ext)`)} - ${pack.description || 'No description'}`,
+        value: pack.id,
+        short: pack.name
+      }));
+
+      const inquirer = (await import('inquirer')).default;
+      const { selectedPack } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'selectedPack',
+          message: 'Select pack to install:',
+          choices,
+          pageSize: 10
+        }
+      ]);
+
+      selectedPackFile = selectedPack;
+      isFromRegistry = true;
 
     } catch (error) {
       checkSpinner.fail('Failed to connect');

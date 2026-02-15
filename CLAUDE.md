@@ -6,6 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ext-pack is a Node.js CLI tool that bundles and installs Chromium-based browser extensions (Brave, Chrome, Chromium, Edge) with zero friction. It creates `.extpack` files (JSON format, v2/v3) containing extension references, then relaunches browsers with `--load-extension` to load them persistently.
 
+## ⚠️ CRITICAL: Testing Requirement
+
+**BEFORE pushing ANY changes, you MUST:**
+1. Test EVERY user flow end-to-end
+2. Verify each command works as expected
+3. Check for errors at each step
+4. Run `npm link` to test local changes
+5. Only commit once ALL flows work perfectly
+
+**Main User Flows to Test:**
+- **Publish**: `ext-pack publish` → detects extensions, creates pack, publishes to registry (single command)
+- **Install**: `ext-pack install` → shows registry packs, user selects, installs (single command)
+- **Share**: `ext-pack share` → auto-finds pack, generates URL/QR
+- **Search**: `ext-pack search <query>` → searches registry
+- **List**: `ext-pack list` → shows installed packs
+- **Info**: `ext-pack info <pack>` → shows pack details
+
 ## Commands
 
 ```bash

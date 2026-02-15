@@ -9,9 +9,10 @@ import ora from 'ora';
 import { colors, successBox, errorBox, clearScreen, findPackFileSmart, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { publishPack, hasGitHubAuth } from '../core/github-publisher.js';
+import { runCreateWizard } from './create-wizard.js';
 
 /**
- * Run the publish wizard
+ * Run the publish wizard (creates pack if needed, then publishes)
  * @param {string} packPath - Path to pack file (optional)
  * @param {Object} options - Publish options
  */
@@ -20,11 +21,25 @@ export async function runPublishWizard(packPath = null, options = {}) {
 
   console.log(colors.bold('\n  📦 Publish to Registry\n'));
 
-  // Step 1: Select pack file if not provided (smart auto-detection!)
+  // Step 1: Get or create pack
   if (!packPath) {
+    // Try to find existing pack
     packPath = await findPackFileSmart('Select pack to publish:');
+
+    // If no pack found, create one!
     if (!packPath) {
-      return;
+      console.log(colors.muted('\nNo pack found. Creating one first...\n'));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      packPath = await runCreateWizard();
+
+      if (!packPath) {
+        console.log(colors.muted('\nPublish cancelled.\n'));
+        return;
+      }
+
+      console.log(colors.success(`\n✓ Pack created: ${packPath}\n`));
+      console.log(colors.bold('  📦 Publishing to Registry\n'));
     }
   } else {
     packPath = resolve(packPath);

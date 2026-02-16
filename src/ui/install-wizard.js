@@ -9,7 +9,7 @@ import cliProgress from 'cli-progress';
 import { resolve, join } from 'path';
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
-import { colors, successBox, errorBox, warningBox, formatPackSummary, clearScreen, pause } from './helpers.js';
+import { colors, successBox, errorBox, warningBox, formatPackSummary, formatExtensionList, clearScreen, pause } from './helpers.js';
 import { readPackFile } from '../core/pack-codec.js';
 import { installPack } from '../core/pack-installer.js';
 import { detectBrowsers, getPreferredBrowser } from '../utils/browser-detector.js';
@@ -124,6 +124,8 @@ export async function runInstallWizard(packFile = null) {
   }
 
   // Detect if it's a registry name or file path
+  let packInfo = null; // Store pack info for preview before download
+
   if (!selectedPackFile.endsWith('.extpack') && !existsSync(selectedPackFile)) {
     // Might be a registry pack name
     const checkSpinner = ora('Checking registry...').start();
@@ -141,7 +143,7 @@ export async function runInstallWizard(packFile = null) {
         return false;
       }
 
-      const packInfo = await getPackInfo(selectedPackFile);
+      packInfo = await getPackInfo(selectedPackFile);
 
       if (!packInfo) {
         checkSpinner.fail('Pack not found');
@@ -155,6 +157,44 @@ export async function runInstallWizard(packFile = null) {
 
       checkSpinner.succeed(`Found pack: ${packInfo.name}`);
       isFromRegistry = true;
+
+      // Show pack preview BEFORE downloading
+      console.log();
+      console.log(formatPackSummary(packInfo));
+      console.log();
+
+      // Show extension list
+      if (packInfo.extensions && packInfo.extensions.length > 0) {
+        console.log(colors.bold('  Extensions:\n'));
+        console.log(formatExtensionList(packInfo.extensions));
+        console.log();
+      }
+
+      // Show store extensions warning upfront if any
+      const storeExtensions = packInfo.extensions?.filter(ext => ext.type === 'store') || [];
+      if (storeExtensions.length > 0) {
+        console.log(colors.warning(`Note: ${storeExtensions.length} extension(s) require manual install from Chrome Web Store.`));
+        storeExtensions.forEach(ext => {
+          console.log(colors.muted(`  ${ext.name}${ext.id ? ` — chrome.google.com/webstore/detail/${ext.id}` : ''}`));
+        });
+        console.log();
+      }
+
+      // Confirm download
+      const { confirmDownload } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmDownload',
+          message: 'Download and install this pack?',
+          default: true
+        }
+      ]);
+
+      if (!confirmDownload) {
+        console.log(errorBox('Installation cancelled.'));
+        await pause();
+        return false;
+      }
 
       // Download pack to temp directory
       const tempDir = tmpdir();
@@ -201,35 +241,46 @@ export async function runInstallWizard(packFile = null) {
     return false;
   }
 
-  // Step 3: Show pack summary
-  console.log();
-  console.log(formatPackSummary(pack));
-  console.log();
-
-  // Show store extensions warning upfront if any
-  const storeExtensions = pack.extensions.filter(ext => ext.type === 'store');
-  if (storeExtensions.length > 0) {
-    console.log(colors.warning(`Note: ${storeExtensions.length} extension(s) require manual install from Chrome Web Store.`));
-    storeExtensions.forEach(ext => {
-      console.log(colors.muted(`  ${ext.name}${ext.id ? ` — chrome.google.com/webstore/detail/${ext.id}` : ''}`));
-    });
+  // Step 3: Show pack summary (only for local files, registry packs already shown)
+  if (!isFromRegistry) {
     console.log();
+    console.log(formatPackSummary(pack));
+    console.log();
+
+    // Show extension list
+    if (pack.extensions && pack.extensions.length > 0) {
+      console.log(colors.bold('  Extensions:\n'));
+      console.log(formatExtensionList(pack.extensions));
+      console.log();
+    }
+
+    // Show store extensions warning upfront if any
+    const storeExtensions = pack.extensions.filter(ext => ext.type === 'store');
+    if (storeExtensions.length > 0) {
+      console.log(colors.warning(`Note: ${storeExtensions.length} extension(s) require manual install from Chrome Web Store.`));
+      storeExtensions.forEach(ext => {
+        console.log(colors.muted(`  ${ext.name}${ext.id ? ` — chrome.google.com/webstore/detail/${ext.id}` : ''}`));
+      });
+      console.log();
+    }
   }
 
-  // Step 4: Confirm installation
-  const { confirmInstall } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'confirmInstall',
-      message: 'Install this pack?',
-      default: true
-    }
-  ]);
+  // Step 4: Confirm installation (only for local files, registry packs already confirmed)
+  if (!isFromRegistry) {
+    const { confirmInstall } = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'confirmInstall',
+        message: 'Install this pack?',
+        default: true
+      }
+    ]);
 
-  if (!confirmInstall) {
-    console.log(errorBox('Installation cancelled.'));
-    await pause();
-    return false;
+    if (!confirmInstall) {
+      console.log(errorBox('Installation cancelled.'));
+      await pause();
+      return false;
+    }
   }
 
   // Step 5: Select browser

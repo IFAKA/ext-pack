@@ -15,6 +15,13 @@ export const infoCommand = new Command('info')
   .argument('<pack>', 'Pack file path or registry name')
   .description('Show detailed information about a pack')
   .option('--json', 'Output as JSON')
+  .addHelpText('after', `
+Examples:
+  $ ext-pack info my-pack                     # Show registry pack info
+  $ ext-pack info dev-tools.extpack           # Show local pack file info
+  $ ext-pack info ~/.ext-pack/packs/pack.extpack  # Show pack from custom path
+  $ ext-pack info my-pack --json              # Output as JSON for scripting
+`)
   .action(async (pack, options) => {
     let packData;
     let source;

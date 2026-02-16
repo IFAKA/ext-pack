@@ -328,30 +328,11 @@ export async function runCreateWizard(options = {}) {
       `Size: ${bundledSizeMB} MB`
     ));
 
-    // Ask if user wants to publish to registry (unless --local-only flag)
-    if (!options.localOnly) {
-      console.log();
-      const { shouldPublish } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'shouldPublish',
-          message: 'Publish to registry?',
-          default: false
-        }
-      ]);
-
-      if (shouldPublish) {
-        console.log(colors.muted('\nPublishing to registry...\n'));
-        const { runPublishWizard } = await import('./publish-wizard.js');
-        await runPublishWizard(outputFile, options);
-      } else {
-        console.log(colors.muted('\nPack saved locally. Share it with friends!\n'));
-        // Show shareable URL
-        const { generateUrl } = await import('../core/pack-codec.js');
-        const shareUrl = generateUrl(pack);
-        console.log(colors.muted(`Share URL: ${shareUrl}\n`));
-      }
-    }
+    // Show next steps
+    console.log(colors.bold('\n  Next steps:\n'));
+    console.log(`  ${colors.highlight(`ext-pack publish ${outputFile}`)}  # Publish to registry`);
+    console.log(`  ${colors.highlight(`ext-pack share ${outputFile}`)}    # Get shareable URL/QR code`);
+    console.log(`  ${colors.highlight(`ext-pack install ${outputFile}`)}  # Test installation locally\n`);
 
     return outputFile;
   } catch (err) {

@@ -14,6 +14,15 @@ export const searchCommand = new Command('search')
   .option('--sort <field>', 'Sort by: downloads, stars, updated, name', 'downloads')
   .option('--limit <number>', 'Max results to show', '20')
   .option('--json', 'Output as JSON')
+  .addHelpText('after', `
+Examples:
+  $ ext-pack search "privacy"              # Search for privacy-related packs
+  $ ext-pack search "ad blocker"           # Search for ad blocking extensions
+  $ ext-pack search dev --tag developer    # Filter by developer tag
+  $ ext-pack search tools --sort stars     # Sort by stars instead of downloads
+  $ ext-pack search security --limit 10    # Show only 10 results
+  $ ext-pack search productivity --json    # Output as JSON for scripting
+`)
   .action(async (query, options) => {
     const spinner = ora('Searching registry...').start();
 

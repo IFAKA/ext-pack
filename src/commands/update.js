@@ -13,6 +13,13 @@ export const updateCommand = new Command('update')
   .argument('[pack]', 'Pack name to update (updates all if not specified)')
   .description('Update installed pack(s) to latest version')
   .option('-y, --yes', 'Skip confirmations')
+  .addHelpText('after', `
+Examples:
+  $ ext-pack update                 # Check all installed packs for updates
+  $ ext-pack update my-pack         # Update specific pack
+  $ ext-pack update my-pack -y      # Update without confirmation prompts
+  $ ext-pack update --yes           # Update all packs without prompts
+`)
   .action(async (packName, options) => {
     const spinner = ora('Checking registry...').start();
 
@@ -85,12 +92,68 @@ export const updateCommand = new Command('update')
       return;
     }
 
-    // Show available updates
+    // Show available updates with changelog
     console.log(colors.bold(`\n  ${updates.length} update(s) available:\n`));
 
-    updates.forEach(({ pack, current, latest }) => {
+    updates.forEach(({ pack, registryInfo, current, latest }) => {
       console.log(`  ${colors.highlight(pack.name)}`);
-      console.log(`  ${colors.muted(current)} → ${colors.success(latest)}`);
+      console.log(`  ${colors.muted('Version:')} ${colors.muted(current)} → ${colors.success(latest)}`);
+
+      // Show what changed
+      if (registryInfo.description && registryInfo.description !== pack.description) {
+        console.log(`  ${colors.muted('Description:')} ${registryInfo.description}`);
+      }
+
+      // Show extension changes
+      const currentExtensions = pack.extensions || [];
+      const newExtensions = registryInfo.extensions || [];
+
+      if (newExtensions.length !== currentExtensions.length) {
+        console.log(`  ${colors.muted('Extensions:')} ${currentExtensions.length} → ${newExtensions.length}`);
+      }
+
+      // Show new extensions
+      const currentExtNames = new Set(currentExtensions.map(e => e.name));
+      const addedExtensions = newExtensions.filter(e => !currentExtNames.has(e.name));
+
+      if (addedExtensions.length > 0) {
+        console.log(`  ${colors.success(`✓ Added ${addedExtensions.length} extension(s):`)}`);
+        addedExtensions.forEach(ext => {
+          console.log(`    • ${ext.name} ${ext.version ? `v${ext.version}` : ''}`);
+        });
+      }
+
+      // Show removed extensions
+      const newExtNames = new Set(newExtensions.map(e => e.name));
+      const removedExtensions = currentExtensions.filter(e => !newExtNames.has(e.name));
+
+      if (removedExtensions.length > 0) {
+        console.log(`  ${colors.warning(`⚠ Removed ${removedExtensions.length} extension(s):`)}`);
+        removedExtensions.forEach(ext => {
+          console.log(`    • ${ext.name}`);
+        });
+      }
+
+      // Show updated extensions (same name, different version)
+      const updatedExtensions = newExtensions.filter(newExt => {
+        const oldExt = currentExtensions.find(e => e.name === newExt.name);
+        return oldExt && oldExt.version !== newExt.version;
+      });
+
+      if (updatedExtensions.length > 0) {
+        console.log(`  ${colors.muted(`Updated ${updatedExtensions.length} extension(s):`)}`);
+        updatedExtensions.forEach(newExt => {
+          const oldExt = currentExtensions.find(e => e.name === newExt.name);
+          console.log(`    • ${newExt.name}: ${oldExt.version || '?'} → ${newExt.version || '?'}`);
+        });
+      }
+
+      // Show release notes if available
+      if (registryInfo.releaseNotes) {
+        console.log(`  ${colors.muted('Release notes:')}`);
+        console.log(`    ${registryInfo.releaseNotes}`);
+      }
+
       console.log();
     });
 
